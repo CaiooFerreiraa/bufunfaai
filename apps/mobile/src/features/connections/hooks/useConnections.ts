@@ -5,13 +5,15 @@ import type {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
-  connectInstitution,
+  completeInstitutionConnection,
+  createConnectSession,
   fetchConnections,
   fetchInstitutions,
   fetchSyncStatus,
   triggerConnectionSync,
 } from '@/features/connections/services/connectionsService';
 import type {
+  ConnectSession,
   ConnectionItem,
   InstitutionItem,
   SyncStatusData,
@@ -46,11 +48,24 @@ export function useConnectionsQuery(): UseQueryResult<ConnectionItem[], Error> {
   });
 }
 
-export function useConnectInstitutionMutation(): UseMutationResult<ConnectionItem, Error, string> {
+export function useCreateConnectSessionMutation(): UseMutationResult<ConnectSession, Error, string> {
+  return useMutation({
+    mutationFn: createConnectSession,
+  });
+}
+
+export function useCompleteInstitutionConnectionMutation(): UseMutationResult<
+  ConnectionItem,
+  Error,
+  { readonly consentId: string; readonly itemId: string }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: connectInstitution,
+    mutationFn: ({
+      consentId,
+      itemId,
+    }): Promise<ConnectionItem> => completeInstitutionConnection(consentId, itemId),
     onSuccess: async (): Promise<void> => {
       await queryClient.invalidateQueries({ queryKey: connectionsQueryKey });
     },

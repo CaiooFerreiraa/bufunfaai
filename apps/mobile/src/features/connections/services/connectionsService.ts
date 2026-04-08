@@ -1,4 +1,5 @@
 import type {
+  ConnectSession,
   ConnectionItem,
   InstitutionItem,
   SyncJobItem,
@@ -23,36 +24,32 @@ export async function fetchConnections(): Promise<ConnectionItem[]> {
   return response.data.data.connections;
 }
 
-export async function connectInstitution(institutionId: string): Promise<ConnectionItem> {
-  const redirectUri: string = 'https://app.bufunfa.ai/open-finance/callback';
-
+export async function createConnectSession(institutionId: string): Promise<ConnectSession> {
   const consentResponse = await apiClient.post<
     ApiResponse<{ readonly consent: { readonly id: string } }>
   >(endpoints.openFinance.consents, {
     institution_id: institutionId,
     purpose: 'Consolidacao financeira pessoal',
     permissions: ['ACCOUNTS_READ', 'BALANCES_READ', 'TRANSACTIONS_READ'],
-    redirect_uri: redirectUri,
+    redirect_uri: 'https://bufunfaai-api.caiof.com.br/v1/open-finance/callback',
   });
 
   const consentId: string = consentResponse.data.data.consent.id;
-  const authorizationResponse = await apiClient.post<
-    ApiResponse<{ readonly authorization_url: string }>
-  >(endpoints.openFinance.authorizeConsent(consentId));
-  const authorizationUrl: string = authorizationResponse.data.data.authorization_url;
+  const connectTokenResponse = await apiClient.post<ApiResponse<ConnectSession>>(
+    endpoints.openFinance.connectToken(consentId),
+  );
 
-  const parsedUrl = new URL(authorizationUrl);
-  const state: string = parsedUrl.searchParams.get('state') ?? '';
-  const code: string = parsedUrl.searchParams.get('code') ?? '';
+  return connectTokenResponse.data.data;
+}
 
-  const callbackResponse = await apiClient.post<
+export async function completeInstitutionConnection(consentId: string, itemId: string): Promise<ConnectionItem> {
+  const response = await apiClient.post<
     ApiResponse<{ readonly connection: ConnectionItem }>
-  >(endpoints.openFinance.callback, {
-    state,
-    code,
+  >(endpoints.openFinance.completeConsent(consentId), {
+    item_id: itemId,
   });
 
-  return callbackResponse.data.data.connection;
+  return response.data.data.connection;
 }
 
 export async function triggerConnectionSync(connectionId: string): Promise<SyncJobItem[]> {

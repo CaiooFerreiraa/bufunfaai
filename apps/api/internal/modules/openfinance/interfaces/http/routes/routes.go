@@ -17,6 +17,8 @@ func Register(publicGroup *gin.RouterGroup, protectedGroup *gin.RouterGroup, han
 	openFinanceGroup.POST("/consents", handler.CreateConsent)
 	openFinanceGroup.GET("/consents/:id", handler.GetConsent)
 	openFinanceGroup.POST("/consents/:id/authorize", handler.AuthorizeConsent)
+	openFinanceGroup.POST("/consents/:id/connect-token", handler.CreateConnectToken)
+	openFinanceGroup.POST("/consents/:id/complete", handler.CompleteConsent)
 	openFinanceGroup.POST("/consents/:id/revoke", handler.RevokeConsent)
 	openFinanceGroup.GET("/connections", handler.ListConnections)
 	openFinanceGroup.GET("/connections/:id", handler.GetConnection)

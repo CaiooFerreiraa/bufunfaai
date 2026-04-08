@@ -24,7 +24,7 @@ func (provider *MockProvider) ListInstitutions(_ context.Context) ([]entity.Inst
 	return []entity.Institution{
 		{
 			ID:                     "7a5acb89-2f24-49c5-b5e7-8fbd62af8f00",
-			DirectoryOrgID:         "mock-dir-001",
+			DirectoryOrgID:         "1",
 			BrandName:              "Mock Bank",
 			DisplayName:            "Mock Bank Sandbox",
 			AuthorisationServerURL: "https://mock-bank.example/auth",
@@ -59,6 +59,23 @@ func (provider *MockProvider) BuildAuthorizationURL(_ context.Context, _ entity.
 	return callbackURL.String(), nil
 }
 
+func (provider *MockProvider) CreateConnectToken(_ context.Context, _ entity.Institution, consent entity.Consent) (ofservice.ProviderConnectToken, error) {
+	return ofservice.ProviderConnectToken{
+		ConnectToken:        "mock-connect-token-" + consent.ID,
+		SelectedConnectorID: 1,
+	}, nil
+}
+
+func (provider *MockProvider) GetItem(_ context.Context, itemID string) (ofservice.ProviderItem, error) {
+	now := time.Now().UTC()
+	return ofservice.ProviderItem{
+		ID:            itemID,
+		ConnectorID:   1,
+		Status:        "UPDATED",
+		LastUpdatedAt: &now,
+	}, nil
+}
+
 func (provider *MockProvider) ExchangeCode(_ context.Context, _ entity.Institution, consent entity.Consent, code string) (ofservice.ProviderTokenSet, error) {
 	if !strings.HasPrefix(code, "mock-code-"+consent.ID) {
 		return ofservice.ProviderTokenSet{}, fmt.Errorf("invalid mock authorization code")
@@ -80,7 +97,7 @@ func (provider *MockProvider) RevokeConsent(_ context.Context, _ entity.Institut
 	return nil
 }
 
-func (provider *MockProvider) SyncResources(_ context.Context, _ entity.Institution, _ entity.Connection) ([]ofservice.ProviderSyncResult, error) {
+func (provider *MockProvider) SyncResources(_ context.Context, _ entity.Institution, _ entity.Consent, _ entity.Connection) ([]ofservice.ProviderSyncResult, error) {
 	return []ofservice.ProviderSyncResult{
 		{ResourceType: entity.ResourceAccounts, Status: entity.SyncJobStatusCompleted},
 		{ResourceType: entity.ResourceBalances, Status: entity.SyncJobStatusCompleted},

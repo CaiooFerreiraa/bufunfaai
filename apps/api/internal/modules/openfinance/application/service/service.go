@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,9 +28,11 @@ type Provider interface {
 	ListInstitutions(ctx context.Context) ([]entity.Institution, error)
 	CreateConsent(ctx context.Context, institution entity.Institution, consent entity.Consent, permissions []string) (string, *time.Time, error)
 	BuildAuthorizationURL(ctx context.Context, institution entity.Institution, consent entity.Consent) (string, error)
+	CreateConnectToken(ctx context.Context, institution entity.Institution, consent entity.Consent) (ProviderConnectToken, error)
+	GetItem(ctx context.Context, itemID string) (ProviderItem, error)
 	ExchangeCode(ctx context.Context, institution entity.Institution, consent entity.Consent, code string) (ProviderTokenSet, error)
 	RevokeConsent(ctx context.Context, institution entity.Institution, consent entity.Consent) error
-	SyncResources(ctx context.Context, institution entity.Institution, connection entity.Connection) ([]ProviderSyncResult, error)
+	SyncResources(ctx context.Context, institution entity.Institution, consent entity.Consent, connection entity.Connection) ([]ProviderSyncResult, error)
 }
 
 type Cipher interface {
@@ -44,6 +47,20 @@ type ProviderTokenSet struct {
 	Scope            string
 	ExpiresAt        time.Time
 	RefreshExpiresAt *time.Time
+}
+
+type ProviderConnectToken struct {
+	ConnectToken        string
+	SelectedConnectorID int64
+}
+
+type ProviderItem struct {
+	ID              string
+	ConnectorID     int64
+	Status          string
+	ExecutionStatus string
+	LastUpdatedAt   *time.Time
+	ErrorCode       string
 }
 
 type ProviderSyncResult struct {
@@ -236,6 +253,96 @@ func (service *Service) AuthorizeConsent(ctx context.Context, consentID string, 
 	}
 
 	return authorizationURL, nil
+}
+
+func (service *Service) CreateConnectToken(ctx context.Context, consentID string, userID string) (ProviderConnectToken, *sharederrors.AppError) {
+	consent, appError := service.GetConsent(ctx, consentID, userID)
+	if appError != nil {
+		return ProviderConnectToken{}, appError
+	}
+
+	institution, appError := service.GetInstitution(ctx, consent.InstitutionID)
+	if appError != nil {
+		return ProviderConnectToken{}, appError
+	}
+
+	connectToken, err := service.provider.CreateConnectToken(ctx, institution, consent)
+	if err != nil {
+		return ProviderConnectToken{}, sharederrors.Wrap("OPEN_FINANCE_CONNECT_TOKEN_ERROR", "erro ao preparar conexão com o banco", 502, err)
+	}
+
+	consent.Status = entity.ConsentStatusAuthInProgress
+	consent.UpdatedAt = service.now().UTC()
+	if err := service.consentRepository.Update(ctx, consent); err != nil {
+		return ProviderConnectToken{}, sharederrors.Wrap("OPEN_FINANCE_CONNECT_TOKEN_ERROR", "erro ao atualizar consentimento", 500, err)
+	}
+
+	return connectToken, nil
+}
+
+func (service *Service) CompleteConsent(ctx context.Context, consentID string, userID string, itemID string) (entity.Consent, entity.Connection, *sharederrors.AppError) {
+	consent, appError := service.GetConsent(ctx, consentID, userID)
+	if appError != nil {
+		return entity.Consent{}, entity.Connection{}, appError
+	}
+
+	institution, appError := service.GetInstitution(ctx, consent.InstitutionID)
+	if appError != nil {
+		return entity.Consent{}, entity.Connection{}, appError
+	}
+
+	item, err := service.provider.GetItem(ctx, itemID)
+	if err != nil {
+		return entity.Consent{}, entity.Connection{}, sharederrors.Wrap("OPEN_FINANCE_CONNECTION_ERROR", "erro ao validar conexão com o banco", 502, err)
+	}
+
+	if err := validateProviderItem(institution, item); err != nil {
+		return entity.Consent{}, entity.Connection{}, sharederrors.Wrap("OPEN_FINANCE_CONNECTION_ERROR", "erro ao validar banco selecionado", 400, err)
+	}
+
+	now := service.now().UTC()
+	consent.ExternalConsentID = item.ID
+	consent.Status = entity.ConsentStatusAuthorised
+	consent.AuthorisedAt = &now
+	consent.UpdatedAt = now
+	if err := service.consentRepository.Update(ctx, consent); err != nil {
+		return entity.Consent{}, entity.Connection{}, sharederrors.Wrap("OPEN_FINANCE_CONNECTION_ERROR", "erro ao atualizar consentimento", 500, err)
+	}
+
+	connectionStatus := mapConnectionStatus(item)
+	connection := entity.Connection{
+		ID:            uuid.NewString(),
+		UserID:        consent.UserID,
+		InstitutionID: consent.InstitutionID,
+		ConsentID:     consent.ID,
+		Status:        connectionStatus,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	if connectionStatus == entity.ConnectionStatusActive {
+		connection.FirstSyncAt = item.LastUpdatedAt
+		connection.LastSyncAt = item.LastUpdatedAt
+		connection.LastSuccessfulSyncAt = item.LastUpdatedAt
+	} else if connectionStatus == entity.ConnectionStatusPending {
+		connection.LastSyncAt = item.LastUpdatedAt
+	} else {
+		connection.LastErrorCode = normalizeProviderErrorCode(item.ErrorCode, "PROVIDER_STATUS_ERROR")
+		connection.LastErrorMessageRedacted = "Sua conexão com o banco ainda precisa de atenção."
+		connection.LastSyncAt = item.LastUpdatedAt
+	}
+
+	connection, err = service.connectionRepository.CreateOrUpdate(ctx, connection)
+	if err != nil {
+		return entity.Consent{}, entity.Connection{}, sharederrors.Wrap("OPEN_FINANCE_CONNECTION_ERROR", "erro ao registrar conexão", 500, err)
+	}
+
+	jobs := buildSyncJobsFromConnection(connection, now)
+	if err := service.syncJobRepository.ReplaceForConnection(ctx, connection.ID, jobs); err != nil {
+		return entity.Consent{}, entity.Connection{}, sharederrors.Wrap("OPEN_FINANCE_SYNC_ERROR", "erro ao preparar status inicial da conexão", 500, err)
+	}
+
+	return consent, connection, nil
 }
 
 func (service *Service) HandleCallback(ctx context.Context, state string, code string) (entity.Consent, entity.Connection, *sharederrors.AppError) {
@@ -468,7 +575,12 @@ func (service *Service) syncConnectionResources(
 	connection entity.Connection,
 	now time.Time,
 ) ([]entity.SyncJob, *sharederrors.AppError) {
-	results, err := service.provider.SyncResources(ctx, institution, connection)
+	consent, err := service.consentRepository.GetByID(ctx, connection.ConsentID)
+	if err != nil {
+		return nil, sharederrors.Wrap("OPEN_FINANCE_SYNC_ERROR", "erro ao localizar consentimento da conexão", 500, err)
+	}
+
+	results, err := service.provider.SyncResources(ctx, institution, consent, connection)
 	if err != nil {
 		connection.Status = entity.ConnectionStatusSyncError
 		connection.LastErrorCode = "SYNC_PROVIDER_ERROR"
@@ -537,6 +649,92 @@ func buildDefaultSyncJobs(connectionID string, now time.Time) []entity.SyncJob {
 	}
 
 	return jobs
+}
+
+func buildSyncJobsFromConnection(connection entity.Connection, now time.Time) []entity.SyncJob {
+	resourceTypes := []string{
+		entity.ResourceAccounts,
+		entity.ResourceBalances,
+		entity.ResourceTransactions,
+	}
+
+	jobs := make([]entity.SyncJob, 0, len(resourceTypes))
+	for _, resourceType := range resourceTypes {
+		job := entity.SyncJob{
+			ID:           uuid.NewString(),
+			ConnectionID: connection.ID,
+			ResourceType: resourceType,
+			AttemptCount: 1,
+			ScheduledAt:  &now,
+			CreatedAt:    now,
+		}
+
+		switch connection.Status {
+		case entity.ConnectionStatusActive:
+			job.Status = entity.SyncJobStatusCompleted
+			job.StartedAt = connection.LastSyncAt
+			job.FinishedAt = connection.LastSuccessfulSyncAt
+		case entity.ConnectionStatusPending:
+			job.Status = entity.SyncJobStatusPending
+		default:
+			job.Status = entity.SyncJobStatusError
+			job.StartedAt = connection.LastSyncAt
+			job.FinishedAt = connection.LastSyncAt
+			job.ErrorCode = normalizeProviderErrorCode(connection.LastErrorCode, "PROVIDER_STATUS_ERROR")
+			job.ErrorMessageRedacted = connection.LastErrorMessageRedacted
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs
+}
+
+func validateProviderItem(institution entity.Institution, item ProviderItem) error {
+	expectedConnectorID := institution.DirectoryOrgID
+	if expectedConnectorID == "" {
+		return errors.New("connector id missing for institution")
+	}
+
+	if expectedConnectorID != stringifyConnectorID(item.ConnectorID) {
+		return errors.New("item connector mismatch")
+	}
+
+	return nil
+}
+
+func mapConnectionStatus(item ProviderItem) string {
+	switch item.Status {
+	case "UPDATED":
+		return entity.ConnectionStatusActive
+	case "WAITING_USER_INPUT", "WAITING_USER_ACTION", "UPDATING", "CREATED":
+		return entity.ConnectionStatusPending
+	case "LOGIN_ERROR":
+		return entity.ConnectionStatusReauthRequired
+	default:
+		if item.ExecutionStatus != "" {
+			switch item.ExecutionStatus {
+			case "WAITING_USER_INPUT", "LOGIN_IN_PROGRESS", "CREATING_IN_PROGRESS":
+				return entity.ConnectionStatusPending
+			case "LOGIN_ERROR", "USER_INPUT_TIMEOUT":
+				return entity.ConnectionStatusReauthRequired
+			}
+		}
+
+		return entity.ConnectionStatusSyncError
+	}
+}
+
+func normalizeProviderErrorCode(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+
+	return value
+}
+
+func stringifyConnectorID(connectorID int64) string {
+	return strconv.FormatInt(connectorID, 10)
 }
 
 func hashString(value string) string {

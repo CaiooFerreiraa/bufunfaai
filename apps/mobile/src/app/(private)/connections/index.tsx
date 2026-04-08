@@ -1,6 +1,8 @@
 import { Link } from 'expo-router';
 import type { ReactElement } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { PluggyConnect } from 'react-native-pluggy-connect';
 
 import { EmptyState } from '@/components/feedback/EmptyState';
 import { ErrorState } from '@/components/feedback/ErrorState';
@@ -9,13 +11,22 @@ import { FeatureScreen } from '@/components/layout/FeatureScreen';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { useConnectInstitutionMutation, useConnectionsQuery, useInstitutionsQuery } from '@/features/connections/hooks/useConnections';
+import { env } from '@/constants/env';
+import {
+  useCompleteInstitutionConnectionMutation,
+  useConnectionsQuery,
+  useCreateConnectSessionMutation,
+  useInstitutionsQuery,
+} from '@/features/connections/hooks/useConnections';
+import type { ConnectSession } from '@/features/connections/types/connections.types';
 import { theme } from '@/theme/tokens';
 
 export default function ConnectionsScreen(): ReactElement {
   const institutionsQuery = useInstitutionsQuery();
   const connectionsQuery = useConnectionsQuery();
-  const connectMutation = useConnectInstitutionMutation();
+  const createConnectSessionMutation = useCreateConnectSessionMutation();
+  const completeConnectionMutation = useCompleteInstitutionConnectionMutation();
+  const [activeSession, setActiveSession] = useState<ConnectSession | null>(null);
 
   async function handleConnectFirstInstitution(): Promise<void> {
     const firstInstitution = institutionsQuery.data?.[0];
@@ -23,8 +34,50 @@ export default function ConnectionsScreen(): ReactElement {
       return;
     }
 
-    await connectMutation.mutateAsync(firstInstitution.id);
-    await connectionsQuery.refetch();
+    const session = await createConnectSessionMutation.mutateAsync(firstInstitution.id);
+    setActiveSession(session);
+  }
+
+  async function handleStartConnection(institutionId: string): Promise<void> {
+    const session = await createConnectSessionMutation.mutateAsync(institutionId);
+    setActiveSession(session);
+  }
+
+  if (activeSession) {
+    return (
+      <PluggyConnect
+        connectToken={activeSession.connect_token}
+        includeSandbox={env.appEnv !== 'production'}
+        language="pt"
+        selectedConnectorId={activeSession.selected_connector_id}
+        onClose={(): void => setActiveSession(null)}
+        onError={(): void => {
+          setActiveSession(null);
+          Alert.alert('Não foi possível concluir agora', 'Tente novamente em alguns instantes.');
+        }}
+        onSuccess={({ item }): void => {
+          if (!item?.id) {
+            setActiveSession(null);
+            Alert.alert('Não foi possível concluir agora', 'Tente novamente em alguns instantes.');
+            return;
+          }
+
+          void completeConnectionMutation
+            .mutateAsync({
+              consentId: activeSession.consent_id,
+              itemId: item.id,
+            })
+            .then(async (): Promise<void> => {
+              setActiveSession(null);
+              await connectionsQuery.refetch();
+            })
+            .catch((): void => {
+              setActiveSession(null);
+              Alert.alert('Não foi possível concluir agora', 'Tente novamente em alguns instantes.');
+            });
+        }}
+      />
+    );
   }
 
   return (
@@ -72,22 +125,24 @@ export default function ConnectionsScreen(): ReactElement {
                           <AppText color={theme.colors.accent} variant="label">
                             Conexão ativa
                           </AppText>
-                          <View style={styles.statusChip}>
-                            <AppText>{connection.status}</AppText>
-                          </View>
+                        <View style={styles.statusChip}>
+                          <AppText>{connection.status}</AppText>
                         </View>
-                        <AppText variant="headline">{connection.institution_id}</AppText>
-                        <AppText color={theme.colors.textSecondary}>Último sync: {connection.last_sync_at ?? 'ainda não executado'}</AppText>
                       </View>
-                    </Card>
-                  </Pressable>
-                </Link>
+                      <AppText variant="headline">
+                        {institutionsQuery.data?.find((institution) => institution.id === connection.institution_id)?.display_name ?? 'Banco conectado'}
+                      </AppText>
+                      <AppText color={theme.colors.textSecondary}>Último sync: {connection.last_sync_at ?? 'ainda não executado'}</AppText>
+                    </View>
+                  </Card>
+                </Pressable>
+              </Link>
               ))}
             </View>
           ) : (
             <EmptyState
-              actionLabel={connectMutation.isPending ? 'Conectando...' : 'Conectar primeiro banco'}
-              description="O fluxo mock de Open Finance já está ligado na API para validar consentimento, callback e sincronização."
+              actionLabel={createConnectSessionMutation.isPending ? 'Preparando...' : 'Conectar primeiro banco'}
+              description="Escolha um banco, autorize a leitura e acompanhe tudo daqui."
               onActionPress={(): void => void handleConnectFirstInstitution()}
               title="Nenhuma conexão ativa"
             />
@@ -105,7 +160,11 @@ export default function ConnectionsScreen(): ReactElement {
                     <AppText>{institution.display_name}</AppText>
                     <AppText color={theme.colors.textSecondary}>{institution.status}</AppText>
                   </View>
-                  <Button label="Conectar" onPress={(): void => void connectMutation.mutateAsync(institution.id)} style={styles.connectButton} />
+                  <Button
+                    label={createConnectSessionMutation.isPending ? 'Preparando...' : 'Conectar'}
+                    onPress={(): void => void handleStartConnection(institution.id)}
+                    style={styles.connectButton}
+                  />
                 </View>
               ))}
             </View>

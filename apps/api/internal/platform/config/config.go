@@ -31,6 +31,7 @@ type Config struct {
 	OpenFinanceBaseURL     string
 	OpenFinanceClientID    string
 	OpenFinanceSecret      string
+	OpenFinanceAPIKey      string
 	OpenFinanceMTLSCert    string
 	OpenFinanceMTLSKey     string
 	CronSecret             string
@@ -106,6 +107,7 @@ func Load() (Config, error) {
 		OpenFinanceBaseURL:     getEnv("OPENFINANCE_BASE_URL", ""),
 		OpenFinanceClientID:    getEnv("OPENFINANCE_CLIENT_ID", ""),
 		OpenFinanceSecret:      getEnv("OPENFINANCE_CLIENT_SECRET", ""),
+		OpenFinanceAPIKey:      getEnv("OPENFINANCE_API_KEY", ""),
 		OpenFinanceMTLSCert:    getEnv("OPENFINANCE_MTLS_CERT_PATH", ""),
 		OpenFinanceMTLSKey:     getEnv("OPENFINANCE_MTLS_KEY_PATH", ""),
 		CronSecret:             getEnv("CRON_SECRET", ""),

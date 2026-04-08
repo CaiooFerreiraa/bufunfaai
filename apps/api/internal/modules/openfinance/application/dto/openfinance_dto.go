@@ -1,7 +1,7 @@
 package dto
 
 type CreateConsentRequest struct {
-	InstitutionID string   `json:"institution_id" validate:"required,uuid4"`
+	InstitutionID string   `json:"institution_id" validate:"required,uuid"`
 	Purpose       string   `json:"purpose" validate:"required,min=5,max=255"`
 	Permissions   []string `json:"permissions" validate:"required,min=1,dive,min=3,max=80"`
 	RedirectURI   string   `json:"redirect_uri" validate:"required,url,max=500"`
@@ -10,6 +10,10 @@ type CreateConsentRequest struct {
 type CallbackRequest struct {
 	State string `json:"state" validate:"required,min=8,max=255"`
 	Code  string `json:"code" validate:"required,min=4,max=255"`
+}
+
+type CompleteConsentRequest struct {
+	ItemID string `json:"item_id" validate:"required,uuid"`
 }
 
 type RevokeConsentRequest struct {
@@ -48,6 +52,12 @@ type ConsentOutput struct {
 type AuthorizationURLOutput struct {
 	ConsentID        string `json:"consent_id"`
 	AuthorizationURL string `json:"authorization_url"`
+}
+
+type ConnectTokenOutput struct {
+	ConsentID           string `json:"consent_id"`
+	ConnectToken        string `json:"connect_token"`
+	SelectedConnectorID int64  `json:"selected_connector_id"`
 }
 
 type ConnectionOutput struct {

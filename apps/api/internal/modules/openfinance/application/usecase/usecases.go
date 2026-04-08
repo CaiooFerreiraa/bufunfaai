@@ -37,6 +37,14 @@ func (useCases *UseCases) AuthorizeConsent(ctx context.Context, consentID string
 	return useCases.service.AuthorizeConsent(ctx, consentID, userID)
 }
 
+func (useCases *UseCases) CreateConnectToken(ctx context.Context, consentID string, userID string) (ofservice.ProviderConnectToken, *sharederrors.AppError) {
+	return useCases.service.CreateConnectToken(ctx, consentID, userID)
+}
+
+func (useCases *UseCases) CompleteConsent(ctx context.Context, consentID string, userID string, itemID string) (entity.Consent, entity.Connection, *sharederrors.AppError) {
+	return useCases.service.CompleteConsent(ctx, consentID, userID, itemID)
+}
+
 func (useCases *UseCases) HandleCallback(ctx context.Context, state string, code string) (entity.Consent, entity.Connection, *sharederrors.AppError) {
 	return useCases.service.HandleCallback(ctx, state, code)
 }

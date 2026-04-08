@@ -96,6 +96,46 @@ func (handler *Handler) AuthorizeConsent(context *gin.Context) {
 	})
 }
 
+func (handler *Handler) CreateConnectToken(context *gin.Context) {
+	userID := middleware.CurrentUserID(context)
+	connectToken, appError := handler.useCases.CreateConnectToken(context.Request.Context(), context.Param("id"), userID)
+	if appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	response.OK(context, ofdto.ConnectTokenOutput{
+		ConsentID:           context.Param("id"),
+		ConnectToken:        connectToken.ConnectToken,
+		SelectedConnectorID: connectToken.SelectedConnectorID,
+	})
+}
+
+func (handler *Handler) CompleteConsent(context *gin.Context) {
+	userID := middleware.CurrentUserID(context)
+	var request ofdto.CompleteConsentRequest
+	if err := context.ShouldBindJSON(&request); err != nil {
+		response.Error(context, sharederrors.New("INVALID_PAYLOAD", "payload invalido", http.StatusBadRequest))
+		return
+	}
+
+	if appError := handler.validator.Validate(request); appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	consent, connection, appError := handler.useCases.CompleteConsent(context.Request.Context(), context.Param("id"), userID, request.ItemID)
+	if appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	response.OK(context, ofdto.CallbackResultOutput{
+		Consent:    ofpresenter.ConsentOutput(consent),
+		Connection: ofpresenter.ConnectionOutput(connection),
+	})
+}
+
 func (handler *Handler) Callback(context *gin.Context) {
 	state := context.Query("state")
 	code := context.Query("code")

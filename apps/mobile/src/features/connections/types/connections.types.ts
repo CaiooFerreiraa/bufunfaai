@@ -24,6 +24,12 @@ export interface ConnectionItem {
   readonly updated_at: string;
 }
 
+export interface ConnectSession {
+  readonly consent_id: string;
+  readonly connect_token: string;
+  readonly selected_connector_id: number;
+}
+
 export interface SyncJobItem {
   readonly id: string;
   readonly connection_id: string;

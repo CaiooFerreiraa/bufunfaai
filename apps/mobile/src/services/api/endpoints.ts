@@ -12,6 +12,8 @@ export const endpoints = {
   openFinance: {
     authorizeConsent: (consentId: string): string => `/v1/open-finance/consents/${consentId}/authorize`,
     callback: '/v1/open-finance/callback',
+    completeConsent: (consentId: string): string => `/v1/open-finance/consents/${consentId}/complete`,
+    connectToken: (consentId: string): string => `/v1/open-finance/consents/${consentId}/connect-token`,
     connections: '/v1/open-finance/connections',
     consentById: (consentId: string): string => `/v1/open-finance/consents/${consentId}`,
     consents: '/v1/open-finance/consents',

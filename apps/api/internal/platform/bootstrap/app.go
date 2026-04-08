@@ -155,7 +155,7 @@ func Build(ctx context.Context) (*App, error) {
 		ofTokenRepo,
 		ofConnectionRepo,
 		ofSyncJobRepo,
-		openfinanceprovider.NewMockProvider(),
+		buildOpenFinanceProvider(cfg),
 		cipherService,
 	)
 	openFinanceUseCases := openfinanceusecase.New(openFinanceService)
@@ -221,6 +221,15 @@ func Build(ctx context.Context) (*App, error) {
 			}
 		},
 	}, nil
+}
+
+func buildOpenFinanceProvider(cfg config.Config) openfinanceservice.Provider {
+	pluggyProvider := openfinanceprovider.NewPluggyProvider(cfg)
+	if pluggyProvider.IsConfigured() {
+		return pluggyProvider
+	}
+
+	return openfinanceprovider.NewMockProvider()
 }
 
 func (app *App) Close() {
