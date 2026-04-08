@@ -1,4 +1,5 @@
 import { Link } from 'expo-router';
+import { isAxiosError } from 'axios';
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -27,7 +28,15 @@ export default function LoginScreen(): ReactElement {
     setErrorMessage('');
     try {
       await login(parsed.data);
-    } catch {
+    } catch (error) {
+      if (isAxiosError<{ error?: { message?: string } }>(error)) {
+        const message = error.response?.data?.error?.message;
+        if (message) {
+          setErrorMessage(message);
+          return;
+        }
+      }
+
       setErrorMessage('Não foi possível entrar agora.');
     }
   }
