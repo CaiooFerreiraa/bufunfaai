@@ -75,18 +75,34 @@ func Build(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("failed to connect postgres: %w", err)
 	}
 
-	redisClient, err := cache.Connect(ctx, cfg)
-	if err != nil {
-		observabilityShutdown(ctx)
-		pool.Close()
-		return nil, fmt.Errorf("failed to connect redis: %w", err)
+	var (
+		redisClient   *cache.ClientAdapter
+		readinessProbes []healthhandler.ReadinessProbe
+	)
+
+	readinessProbes = append(readinessProbes, database.NewReadinessProbe(pool))
+
+	if cfg.RedisURL != "" {
+		client, redisErr := cache.Connect(ctx, cfg)
+		if redisErr != nil {
+			observabilityShutdown(ctx)
+			pool.Close()
+			return nil, fmt.Errorf("failed to connect redis: %w", redisErr)
+		}
+
+		redisClient = cache.NewClientAdapter(client)
+		readinessProbes = append(readinessProbes, cache.NewReadinessProbe(client))
+	} else {
+		appLogger.Info("redis disabled", "reason", "REDIS_URL not configured")
 	}
 
 	cipherService, err := platformcrypto.NewCipherService(cfg.EncryptionKey)
 	if err != nil {
 		observabilityShutdown(ctx)
 		pool.Close()
-		_ = redisClient.Close()
+		if redisClient != nil {
+			_ = redisClient.Close()
+		}
 		return nil, fmt.Errorf("failed to initialize crypto service: %w", err)
 	}
 
@@ -135,9 +151,8 @@ func Build(ctx context.Context) (*App, error) {
 	openFinanceUseCases := openfinanceusecase.New(openFinanceService)
 
 	healthHandler := healthhandler.NewHandler(cfg, []healthhandler.ReadinessProbe{
-		database.NewReadinessProbe(pool),
-		cache.NewReadinessProbe(redisClient),
 	})
+	healthHandler = healthhandler.NewHandler(cfg, readinessProbes)
 	authHTTPHandler := authhandler.NewHandler(
 		authusecase.NewRegisterUseCase(authService),
 		authusecase.NewLoginUseCase(authService),
@@ -178,7 +193,9 @@ func Build(ctx context.Context) (*App, error) {
 	if appError := openFinanceUseCases.EnsureInstitutions(ctx); appError != nil {
 		observabilityShutdown(ctx)
 		pool.Close()
-		_ = redisClient.Close()
+		if redisClient != nil {
+			_ = redisClient.Close()
+		}
 		return nil, fmt.Errorf("failed to seed open finance institutions: %w", appError)
 	}
 
@@ -190,7 +207,9 @@ func Build(ctx context.Context) (*App, error) {
 		close: func() {
 			observabilityShutdown(context.Background())
 			pool.Close()
-			_ = redisClient.Close()
+			if redisClient != nil {
+				_ = redisClient.Close()
+			}
 		},
 	}, nil
 }

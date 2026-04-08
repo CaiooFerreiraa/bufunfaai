@@ -23,6 +23,8 @@ tmp/
 .env
 .env.local
 .env.*.local
+apps/api/.env.vercel.production
+apps/mobile/.env.production
 
 # editor / system
 .DS_Store

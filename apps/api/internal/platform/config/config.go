@@ -91,7 +91,7 @@ func Load() (Config, error) {
 		HTTPWriteTimeout:       writeTimeout,
 		HTTPShutdownTimeout:    shutdownTimeout,
 		DatabaseURL:            getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/finance_app?sslmode=disable"),
-		RedisURL:               getEnv("REDIS_URL", "redis://localhost:6379"),
+		RedisURL:               getOptionalEnv("REDIS_URL"),
 		LogLevel:               getEnv("LOG_LEVEL", "info"),
 		CORSAllowedOrigins:     getList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:8081", "http://localhost:19006"}),
 		AccessTokenSecret:      getEnv("JWT_ACCESS_SECRET", "change_me"),
@@ -126,6 +126,10 @@ func getEnv(key string, fallback string) string {
 	}
 
 	return value
+}
+
+func getOptionalEnv(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
 }
 
 func getEnvAny(keys []string, fallback string) string {
