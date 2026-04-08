@@ -86,7 +86,8 @@ func Load() (Config, error) {
 	return Config{
 		AppName:                getEnv("APP_NAME", "finance-api"),
 		Environment:            getEnv("APP_ENV", "development"),
-		Port:                   getEnvAny([]string{"APP_PORT", "PORT"}, "8080"),
+		// Vercel Go backends rely on PORT at runtime; APP_PORT remains for local/dev overrides.
+		Port:                   getEnvAny([]string{"PORT", "APP_PORT"}, "3000"),
 		HTTPReadTimeout:        readTimeout,
 		HTTPWriteTimeout:       writeTimeout,
 		HTTPShutdownTimeout:    shutdownTimeout,
