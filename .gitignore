@@ -25,6 +25,8 @@ tmp/
 .env.*.local
 apps/api/.env.vercel.production
 apps/mobile/.env.production
+apps/mobile/credentials.json
+apps/mobile/credentials/
 
 # editor / system
 .DS_Store

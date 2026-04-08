@@ -11,10 +11,14 @@
       "**/*"
     ],
     "android": {
+      "package": "br.com.caiof.bufunfaai",
       "adaptiveIcon": {
         "backgroundColor": "#070A12",
         "foregroundImage": "./assets/adaptive-icon.png"
       }
+    },
+    "ios": {
+      "bundleIdentifier": "br.com.caiof.bufunfaai"
     },
     "experiments": {
       "typedRoutes": true
@@ -26,10 +30,14 @@
       "expo-notifications"
     ],
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "5c6c742f-14ae-41cd-a458-43706685c611"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "owner": "caioferreira"
   }
 }
