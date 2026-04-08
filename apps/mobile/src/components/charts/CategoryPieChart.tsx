@@ -5,46 +5,28 @@ import { AppText } from '@/components/ui/AppText';
 import { Card } from '@/components/ui/Card';
 import { theme } from '@/theme/tokens';
 
-interface ExpenseSlice {
+export interface CategorySlice {
   readonly amountLabel: string;
   readonly color: string;
   readonly name: string;
   readonly percent: number;
-  readonly trendLabel: string;
 }
 
-const EXPENSE_SLICES: readonly ExpenseSlice[] = [
-  {
-    amountLabel: 'R$ 2.140',
-    color: theme.colors.primary,
-    name: 'Moradia',
-    percent: 42,
-    trendLabel: '+4.2%',
-  },
-  {
-    amountLabel: 'R$ 1.180',
-    color: '#78A7FF',
-    name: 'Cartão',
-    percent: 26,
-    trendLabel: '-2.1%',
-  },
-  {
-    amountLabel: 'R$ 890',
-    color: '#37D7A3',
-    name: 'Alimentação',
-    percent: 18,
-    trendLabel: '+8.0%',
-  },
-  {
-    amountLabel: 'R$ 520',
-    color: '#F8A94C',
-    name: 'Mobilidade',
-    percent: 14,
-    trendLabel: '-1.3%',
-  },
-] as const;
+interface CategoryPieChartProps {
+  readonly emptyDescription?: string;
+  readonly slices: readonly CategorySlice[];
+  readonly title?: string;
+}
 
-export function CategoryPieChart(): ReactElement {
+export function CategoryPieChart(props: CategoryPieChartProps): ReactElement {
+  const {
+    emptyDescription = 'Conecte um banco e aguarde a primeira sincronização para ver a composição das saídas.',
+    slices,
+    title = 'Pressão de saída',
+  } = props;
+
+  const mappedPercent: number = Math.round(slices.reduce((total, slice) => total + slice.percent, 0));
+
   return (
     <Card>
       <View style={styles.wrapper}>
@@ -53,50 +35,61 @@ export function CategoryPieChart(): ReactElement {
             <AppText color={theme.colors.accent} variant="label">
               Analytics
             </AppText>
-            <AppText variant="headline">Pressão de saída</AppText>
+            <AppText variant="headline">{title}</AppText>
           </View>
           <View style={styles.deltaBadge}>
             <AppText color={theme.colors.textInverse} variant="label">
-              72% mapeado
+              {mappedPercent}% mapeado
             </AppText>
           </View>
         </View>
-        <View style={styles.chartShell}>
-          {EXPENSE_SLICES.map((slice: ExpenseSlice): ReactElement => (
-            <View
-              key={slice.name}
-              style={[
-                styles.slice,
-                {
-                  backgroundColor: slice.color,
-                  width: `${slice.percent}%`,
-                },
-              ]}
-            />
-          ))}
-        </View>
-        <View style={styles.legend}>
-          <AppText color={theme.colors.textSecondary}>
-            Uma leitura compacta das categorias que mais comprimem o saldo neste ciclo.
-          </AppText>
-          <View style={styles.slicesList}>
-            {EXPENSE_SLICES.map((slice: ExpenseSlice): ReactElement => (
-              <View key={slice.name} style={styles.row}>
-                <View style={styles.rowLabel}>
-                  <View style={[styles.dot, { backgroundColor: slice.color }]} />
-                  <View style={styles.labelStack}>
-                    <AppText>{slice.name}</AppText>
-                    <AppText color={theme.colors.textSecondary}>{slice.percent}% do total</AppText>
-                  </View>
-                </View>
-                <View style={styles.rowValues}>
-                  <AppText>{slice.amountLabel}</AppText>
-                  <AppText color={theme.colors.textSecondary}>{slice.trendLabel}</AppText>
-                </View>
+        {slices.length > 0 ? (
+          <>
+            <View style={styles.chartShell}>
+              {slices.map(
+                (slice: CategorySlice): ReactElement => (
+                  <View
+                    key={slice.name}
+                    style={[
+                      styles.slice,
+                      {
+                        backgroundColor: slice.color,
+                        width: `${Math.max(slice.percent, 6)}%`,
+                      },
+                    ]}
+                  />
+                ),
+              )}
+            </View>
+            <View style={styles.legend}>
+              <AppText color={theme.colors.textSecondary}>
+                Leitura direta das categorias que mais estão pesando no período.
+              </AppText>
+              <View style={styles.slicesList}>
+                {slices.map(
+                  (slice: CategorySlice): ReactElement => (
+                    <View key={slice.name} style={styles.row}>
+                      <View style={styles.rowLabel}>
+                        <View style={[styles.dot, { backgroundColor: slice.color }]} />
+                        <View style={styles.labelStack}>
+                          <AppText>{slice.name}</AppText>
+                          <AppText color={theme.colors.textSecondary}>
+                            {Math.round(slice.percent)}% do total
+                          </AppText>
+                        </View>
+                      </View>
+                      <View style={styles.rowValues}>
+                        <AppText>{slice.amountLabel}</AppText>
+                      </View>
+                    </View>
+                  ),
+                )}
               </View>
-            ))}
-          </View>
-        </View>
+            </View>
+          </>
+        ) : (
+          <AppText color={theme.colors.textSecondary}>{emptyDescription}</AppText>
+        )}
       </View>
     </Card>
   );
@@ -137,8 +130,8 @@ const styles = StyleSheet.create({
   },
   row: {
     alignItems: 'center',
-    gap: theme.spacing.lg,
     flexDirection: 'row',
+    gap: theme.spacing.lg,
     justifyContent: 'space-between',
   },
   labelStack: {

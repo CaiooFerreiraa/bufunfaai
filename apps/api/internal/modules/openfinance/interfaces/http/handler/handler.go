@@ -3,10 +3,12 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	ofdto "github.com/bufunfaai/bufunfaai/apps/api/internal/modules/openfinance/application/dto"
+	ofservice "github.com/bufunfaai/bufunfaai/apps/api/internal/modules/openfinance/application/service"
 	ofusecase "github.com/bufunfaai/bufunfaai/apps/api/internal/modules/openfinance/application/usecase"
 	ofpresenter "github.com/bufunfaai/bufunfaai/apps/api/internal/modules/openfinance/interfaces/http/presenter"
 	platformvalidator "github.com/bufunfaai/bufunfaai/apps/api/internal/platform/validator"
@@ -192,6 +194,82 @@ func (handler *Handler) ListConnections(context *gin.Context) {
 	}
 
 	response.OK(context, gin.H{"connections": payload})
+}
+
+func (handler *Handler) ListAccounts(context *gin.Context) {
+	userID := middleware.CurrentUserID(context)
+	accounts, appError := handler.useCases.ListAccountSnapshots(context.Request.Context(), userID)
+	if appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	payload := make([]ofdto.AccountSnapshotOutput, 0, len(accounts))
+	for _, account := range accounts {
+		payload = append(payload, ofpresenter.AccountSnapshotOutput(account))
+	}
+
+	response.OK(context, gin.H{"accounts": payload})
+}
+
+func (handler *Handler) Overview(context *gin.Context) {
+	userID := middleware.CurrentUserID(context)
+	overview, appError := handler.useCases.GetOverview(context.Request.Context(), userID)
+	if appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	response.OK(context, gin.H{"overview": ofpresenter.OverviewOutput(overview)})
+}
+
+func (handler *Handler) ListTransactions(context *gin.Context) {
+	userID := middleware.CurrentUserID(context)
+
+	var request ofdto.TransactionsQuery
+	if err := context.ShouldBindQuery(&request); err != nil {
+		response.Error(context, sharederrors.New("INVALID_QUERY", "consulta invalida", http.StatusBadRequest))
+		return
+	}
+
+	if appError := handler.validator.Validate(request); appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	query := ofservice.ProviderTransactionQuery{
+		PageSize: 500,
+	}
+
+	if request.Limit > 0 {
+		query.PageSize = request.Limit
+	}
+
+	if request.From != "" {
+		from, err := time.Parse("2006-01-02", request.From)
+		if err != nil {
+			response.Error(context, sharederrors.New("INVALID_QUERY", "periodo inicial invalido", http.StatusBadRequest))
+			return
+		}
+		query.From = &from
+	}
+
+	if request.To != "" {
+		to, err := time.Parse("2006-01-02", request.To)
+		if err != nil {
+			response.Error(context, sharederrors.New("INVALID_QUERY", "periodo final invalido", http.StatusBadRequest))
+			return
+		}
+		query.To = &to
+	}
+
+	feed, appError := handler.useCases.ListTransactions(context.Request.Context(), userID, query)
+	if appError != nil {
+		response.Error(context, appError)
+		return
+	}
+
+	response.OK(context, gin.H{"feed": ofpresenter.TransactionFeedOutput(feed)})
 }
 
 func (handler *Handler) GetConnection(context *gin.Context) {

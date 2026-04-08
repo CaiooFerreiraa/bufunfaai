@@ -57,6 +57,18 @@ func (useCases *UseCases) ListConnections(ctx context.Context, userID string) ([
 	return useCases.service.ListConnections(ctx, userID)
 }
 
+func (useCases *UseCases) ListAccountSnapshots(ctx context.Context, userID string) ([]ofservice.AccountSnapshot, *sharederrors.AppError) {
+	return useCases.service.ListAccountSnapshots(ctx, userID)
+}
+
+func (useCases *UseCases) GetOverview(ctx context.Context, userID string) (ofservice.Overview, *sharederrors.AppError) {
+	return useCases.service.GetOverview(ctx, userID)
+}
+
+func (useCases *UseCases) ListTransactions(ctx context.Context, userID string, query ofservice.ProviderTransactionQuery) (ofservice.TransactionFeed, *sharederrors.AppError) {
+	return useCases.service.ListTransactions(ctx, userID, query)
+}
+
 func (useCases *UseCases) GetConnection(ctx context.Context, connectionID string, userID string) (entity.Connection, *sharederrors.AppError) {
 	return useCases.service.GetConnection(ctx, connectionID, userID)
 }

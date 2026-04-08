@@ -67,14 +67,19 @@ export function useCompleteInstitutionConnectionMutation(): UseMutationResult<
       itemId,
     }): Promise<ConnectionItem> => completeInstitutionConnection(consentId, itemId),
     onSuccess: async (): Promise<void> => {
-      await queryClient.invalidateQueries({ queryKey: connectionsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: ['open-finance'] });
     },
   });
 }
 
 export function useConnectionSyncMutation(): UseMutationResult<SyncJobItem[], Error, string> {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: triggerConnectionSync,
+    onSuccess: async (): Promise<void> => {
+      await queryClient.invalidateQueries({ queryKey: ['open-finance'] });
+    },
   });
 }
 

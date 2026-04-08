@@ -76,6 +76,14 @@ func (provider *MockProvider) GetItem(_ context.Context, itemID string) (ofservi
 	}, nil
 }
 
+func (provider *MockProvider) ListAccounts(_ context.Context, _ string) ([]ofservice.ProviderAccount, error) {
+	return []ofservice.ProviderAccount{}, nil
+}
+
+func (provider *MockProvider) ListTransactions(_ context.Context, _ string, _ ofservice.ProviderTransactionQuery) ([]ofservice.ProviderTransaction, error) {
+	return []ofservice.ProviderTransaction{}, nil
+}
+
 func (provider *MockProvider) ExchangeCode(_ context.Context, _ entity.Institution, consent entity.Consent, code string) (ofservice.ProviderTokenSet, error) {
 	if !strings.HasPrefix(code, "mock-code-"+consent.ID) {
 		return ofservice.ProviderTokenSet{}, fmt.Errorf("invalid mock authorization code")

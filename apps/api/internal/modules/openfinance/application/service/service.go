@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +33,8 @@ type Provider interface {
 	BuildAuthorizationURL(ctx context.Context, institution entity.Institution, consent entity.Consent) (string, error)
 	CreateConnectToken(ctx context.Context, institution entity.Institution, consent entity.Consent) (ProviderConnectToken, error)
 	GetItem(ctx context.Context, itemID string) (ProviderItem, error)
+	ListAccounts(ctx context.Context, itemID string) ([]ProviderAccount, error)
+	ListTransactions(ctx context.Context, accountID string, query ProviderTransactionQuery) ([]ProviderTransaction, error)
 	ExchangeCode(ctx context.Context, institution entity.Institution, consent entity.Consent, code string) (ProviderTokenSet, error)
 	RevokeConsent(ctx context.Context, institution entity.Institution, consent entity.Consent) error
 	SyncResources(ctx context.Context, institution entity.Institution, consent entity.Consent, connection entity.Connection) ([]ProviderSyncResult, error)
@@ -68,6 +73,100 @@ type ProviderSyncResult struct {
 	Status       string
 	ErrorCode    string
 	ErrorMessage string
+}
+
+type ProviderTransactionQuery struct {
+	From     *time.Time
+	To       *time.Time
+	PageSize int
+}
+
+type ProviderAccount struct {
+	ID                   string
+	ItemID               string
+	Type                 string
+	Subtype              string
+	Number               string
+	Name                 string
+	MarketingName        string
+	Balance              float64
+	CurrencyCode         string
+	BankTransferNumber   string
+	CreditBrand          string
+	AvailableCreditLimit float64
+}
+
+type ProviderTransaction struct {
+	ID           string
+	AccountID    string
+	Description  string
+	Amount       float64
+	Date         time.Time
+	CurrencyCode string
+	Category     string
+	Type         string
+	Status       string
+	MerchantName string
+}
+
+type AccountSnapshot struct {
+	ID                   string
+	ConnectionID         string
+	InstitutionID        string
+	InstitutionName      string
+	ItemID               string
+	Type                 string
+	Subtype              string
+	Name                 string
+	MarketingName        string
+	Number               string
+	CurrencyCode         string
+	Balance              float64
+	BankTransferNumber   string
+	CreditBrand          string
+	AvailableCreditLimit float64
+}
+
+type TransactionSnapshot struct {
+	ID              string
+	AccountID       string
+	ConnectionID    string
+	InstitutionName string
+	AccountName     string
+	Description     string
+	Category        string
+	Type            string
+	Status          string
+	CurrencyCode    string
+	Amount          float64
+	Date            time.Time
+	MerchantName    string
+}
+
+type CategoryBreakdown struct {
+	Category string
+	Amount   float64
+	Percent  float64
+}
+
+type Overview struct {
+	Accounts            []AccountSnapshot
+	RecentTransactions  []TransactionSnapshot
+	ExpenseBreakdown    []CategoryBreakdown
+	TotalAvailable      float64
+	CreditCardBalance   float64
+	MonthIncome         float64
+	MonthExpenses       float64
+	ConnectedAccounts   int
+	ConnectionsWithData int
+}
+
+type TransactionFeed struct {
+	Transactions              []TransactionSnapshot
+	ExpenseBreakdown          []CategoryBreakdown
+	MonthExpenseTotal         float64
+	PreviousMonthExpenseTotal float64
+	MonthIncomeTotal          float64
 }
 
 type ReconciliationResult struct {
@@ -506,6 +605,104 @@ func (service *Service) GetConnection(ctx context.Context, connectionID string, 
 	return connection, nil
 }
 
+func (service *Service) ListAccountSnapshots(ctx context.Context, userID string) ([]AccountSnapshot, *sharederrors.AppError) {
+	sources, appError := service.listConnectedSources(ctx, userID)
+	if appError != nil {
+		return nil, appError
+	}
+
+	accounts, _ := service.listAccountSnapshotsForSources(ctx, sources)
+	return accounts, nil
+}
+
+func (service *Service) GetOverview(ctx context.Context, userID string) (Overview, *sharederrors.AppError) {
+	sources, appError := service.listConnectedSources(ctx, userID)
+	if appError != nil {
+		return Overview{}, appError
+	}
+
+	accounts, activeSourceIDs := service.listAccountSnapshotsForSources(ctx, sources)
+	monthStart := beginningOfMonth(service.now().UTC())
+	transactionQuery := ProviderTransactionQuery{
+		From:     &monthStart,
+		PageSize: 500,
+	}
+	transactions := service.listTransactionSnapshots(ctx, accounts, transactionQuery)
+	sortTransactionSnapshots(transactions)
+
+	recentTransactions := transactions
+	if len(recentTransactions) > 5 {
+		recentTransactions = recentTransactions[:5]
+	}
+
+	overview := Overview{
+		Accounts:            accounts,
+		RecentTransactions:  recentTransactions,
+		ExpenseBreakdown:    buildExpenseBreakdown(transactions),
+		ConnectedAccounts:   len(accounts),
+		ConnectionsWithData: len(activeSourceIDs),
+	}
+
+	for _, account := range accounts {
+		if isCreditAccount(account.Type) {
+			overview.CreditCardBalance += account.Balance
+			continue
+		}
+
+		overview.TotalAvailable += account.Balance
+	}
+
+	for _, transaction := range transactions {
+		normalizedAmount := normalizeTransactionAmount(transaction)
+		if normalizedAmount < 0 {
+			overview.MonthExpenses += math.Abs(normalizedAmount)
+			continue
+		}
+
+		overview.MonthIncome += normalizedAmount
+	}
+
+	return overview, nil
+}
+
+func (service *Service) ListTransactions(ctx context.Context, userID string, query ProviderTransactionQuery) (TransactionFeed, *sharederrors.AppError) {
+	sources, appError := service.listConnectedSources(ctx, userID)
+	if appError != nil {
+		return TransactionFeed{}, appError
+	}
+
+	accounts, _ := service.listAccountSnapshotsForSources(ctx, sources)
+	transactions := service.listTransactionSnapshots(ctx, accounts, query)
+	sortTransactionSnapshots(transactions)
+
+	now := service.now().UTC()
+	currentMonthStart := beginningOfMonth(now)
+	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
+	currentMonthEnd := currentMonthStart.AddDate(0, 1, 0)
+
+	feed := TransactionFeed{
+		Transactions:     transactions,
+		ExpenseBreakdown: buildExpenseBreakdown(filterTransactionsByMonth(transactions, currentMonthStart, currentMonthEnd)),
+	}
+
+	for _, transaction := range transactions {
+		normalizedAmount := normalizeTransactionAmount(transaction)
+
+		switch {
+		case !transaction.Date.Before(currentMonthStart) && transaction.Date.Before(currentMonthEnd):
+			if normalizedAmount < 0 {
+				feed.MonthExpenseTotal += math.Abs(normalizedAmount)
+			} else {
+				feed.MonthIncomeTotal += normalizedAmount
+			}
+		case !transaction.Date.Before(previousMonthStart) && transaction.Date.Before(currentMonthStart) && normalizedAmount < 0:
+			feed.PreviousMonthExpenseTotal += math.Abs(normalizedAmount)
+		}
+	}
+
+	return feed, nil
+}
+
 func (service *Service) SyncConnection(ctx context.Context, connectionID string, userID string) ([]entity.SyncJob, *sharederrors.AppError) {
 	connection, appError := service.GetConnection(ctx, connectionID, userID)
 	if appError != nil {
@@ -649,6 +846,212 @@ func buildDefaultSyncJobs(connectionID string, now time.Time) []entity.SyncJob {
 	}
 
 	return jobs
+}
+
+type connectedSource struct {
+	connection  entity.Connection
+	consent     entity.Consent
+	institution entity.Institution
+}
+
+func (service *Service) listConnectedSources(ctx context.Context, userID string) ([]connectedSource, *sharederrors.AppError) {
+	connections, err := service.connectionRepository.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, sharederrors.Wrap("OPEN_FINANCE_CONNECTION_ERROR", "erro ao listar conexoes", 500, err)
+	}
+
+	institutionCache := make(map[string]entity.Institution, len(connections))
+	sources := make([]connectedSource, 0, len(connections))
+
+	for _, connection := range connections {
+		if connection.Status == entity.ConnectionStatusRevoked {
+			continue
+		}
+
+		consent, err := service.consentRepository.GetByID(ctx, connection.ConsentID)
+		if err != nil || strings.TrimSpace(consent.ExternalConsentID) == "" {
+			continue
+		}
+
+		institution, exists := institutionCache[connection.InstitutionID]
+		if !exists {
+			institution, err = service.institutionRepository.GetByID(ctx, connection.InstitutionID)
+			if err != nil {
+				continue
+			}
+
+			institutionCache[connection.InstitutionID] = institution
+		}
+
+		sources = append(sources, connectedSource{
+			connection:  connection,
+			consent:     consent,
+			institution: institution,
+		})
+	}
+
+	return sources, nil
+}
+
+func (service *Service) listAccountSnapshotsForSources(ctx context.Context, sources []connectedSource) ([]AccountSnapshot, map[string]struct{}) {
+	accounts := make([]AccountSnapshot, 0)
+	activeSourceIDs := make(map[string]struct{}, len(sources))
+
+	for _, source := range sources {
+		providerAccounts, err := service.provider.ListAccounts(ctx, source.consent.ExternalConsentID)
+		if err != nil {
+			continue
+		}
+
+		for _, account := range providerAccounts {
+			accounts = append(accounts, AccountSnapshot{
+				ID:                   account.ID,
+				ConnectionID:         source.connection.ID,
+				InstitutionID:        source.institution.ID,
+				InstitutionName:      source.institution.DisplayName,
+				ItemID:               account.ItemID,
+				Type:                 account.Type,
+				Subtype:              account.Subtype,
+				Name:                 account.Name,
+				MarketingName:        account.MarketingName,
+				Number:               account.Number,
+				CurrencyCode:         account.CurrencyCode,
+				Balance:              account.Balance,
+				BankTransferNumber:   account.BankTransferNumber,
+				CreditBrand:          account.CreditBrand,
+				AvailableCreditLimit: account.AvailableCreditLimit,
+			})
+			activeSourceIDs[source.connection.ID] = struct{}{}
+		}
+	}
+
+	return accounts, activeSourceIDs
+}
+
+func (service *Service) listTransactionSnapshots(ctx context.Context, accounts []AccountSnapshot, query ProviderTransactionQuery) []TransactionSnapshot {
+	transactions := make([]TransactionSnapshot, 0)
+
+	for _, account := range accounts {
+		providerTransactions, err := service.provider.ListTransactions(ctx, account.ID, query)
+		if err != nil {
+			continue
+		}
+
+		for _, transaction := range providerTransactions {
+			transactions = append(transactions, TransactionSnapshot{
+				ID:              transaction.ID,
+				AccountID:       transaction.AccountID,
+				ConnectionID:    account.ConnectionID,
+				InstitutionName: account.InstitutionName,
+				AccountName:     resolveAccountName(account),
+				Description:     strings.TrimSpace(transaction.Description),
+				Category:        resolveTransactionCategory(transaction),
+				Type:            transaction.Type,
+				Status:          transaction.Status,
+				CurrencyCode:    transaction.CurrencyCode,
+				Amount:          transaction.Amount,
+				Date:            transaction.Date,
+				MerchantName:    strings.TrimSpace(transaction.MerchantName),
+			})
+		}
+	}
+
+	return transactions
+}
+
+func resolveAccountName(account AccountSnapshot) string {
+	if value := strings.TrimSpace(account.MarketingName); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(account.Name); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(account.Number); value != "" {
+		return value
+	}
+	return "Conta conectada"
+}
+
+func resolveTransactionCategory(transaction ProviderTransaction) string {
+	if value := strings.TrimSpace(transaction.Category); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(transaction.MerchantName); value != "" {
+		return value
+	}
+	return "Sem categoria"
+}
+
+func sortTransactionSnapshots(transactions []TransactionSnapshot) {
+	sort.SliceStable(transactions, func(left int, right int) bool {
+		return transactions[left].Date.After(transactions[right].Date)
+	})
+}
+
+func buildExpenseBreakdown(transactions []TransactionSnapshot) []CategoryBreakdown {
+	totalsByCategory := make(map[string]float64)
+	totalExpenses := 0.0
+
+	for _, transaction := range transactions {
+		normalizedAmount := normalizeTransactionAmount(transaction)
+		if normalizedAmount >= 0 {
+			continue
+		}
+
+		amount := math.Abs(normalizedAmount)
+		totalsByCategory[transaction.Category] += amount
+		totalExpenses += amount
+	}
+
+	if totalExpenses == 0 {
+		return []CategoryBreakdown{}
+	}
+
+	breakdown := make([]CategoryBreakdown, 0, len(totalsByCategory))
+	for category, amount := range totalsByCategory {
+		breakdown = append(breakdown, CategoryBreakdown{
+			Category: category,
+			Amount:   amount,
+			Percent:  (amount / totalExpenses) * 100,
+		})
+	}
+
+	sort.SliceStable(breakdown, func(left int, right int) bool {
+		return breakdown[left].Amount > breakdown[right].Amount
+	})
+
+	if len(breakdown) > 4 {
+		breakdown = breakdown[:4]
+	}
+
+	return breakdown
+}
+
+func filterTransactionsByMonth(transactions []TransactionSnapshot, start time.Time, end time.Time) []TransactionSnapshot {
+	filtered := make([]TransactionSnapshot, 0, len(transactions))
+	for _, transaction := range transactions {
+		if transaction.Date.Before(start) || !transaction.Date.Before(end) {
+			continue
+		}
+		filtered = append(filtered, transaction)
+	}
+	return filtered
+}
+
+func beginningOfMonth(value time.Time) time.Time {
+	return time.Date(value.Year(), value.Month(), 1, 0, 0, 0, 0, time.UTC)
+}
+
+func isCreditAccount(accountType string) bool {
+	return strings.EqualFold(strings.TrimSpace(accountType), "CREDIT")
+}
+
+func normalizeTransactionAmount(transaction TransactionSnapshot) float64 {
+	amount := math.Abs(transaction.Amount)
+	if strings.EqualFold(transaction.Type, "DEBIT") {
+		return -amount
+	}
+	return amount
 }
 
 func buildSyncJobsFromConnection(connection entity.Connection, now time.Time) []entity.SyncJob {

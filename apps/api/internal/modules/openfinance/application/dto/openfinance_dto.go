@@ -104,3 +104,70 @@ type ReconciliationResultOutput struct {
 	Failed      int `json:"failed"`
 	JobsCreated int `json:"jobs_created"`
 }
+
+type TransactionsQuery struct {
+	From  string `form:"from" validate:"omitempty,datetime=2006-01-02"`
+	To    string `form:"to" validate:"omitempty,datetime=2006-01-02"`
+	Limit int    `form:"limit" validate:"omitempty,min=1,max=500"`
+}
+
+type AccountSnapshotOutput struct {
+	ID                   string  `json:"id"`
+	ConnectionID         string  `json:"connection_id"`
+	InstitutionID        string  `json:"institution_id"`
+	InstitutionName      string  `json:"institution_name"`
+	ItemID               string  `json:"item_id"`
+	Type                 string  `json:"type"`
+	Subtype              string  `json:"subtype,omitempty"`
+	Name                 string  `json:"name"`
+	MarketingName        string  `json:"marketing_name,omitempty"`
+	Number               string  `json:"number,omitempty"`
+	CurrencyCode         string  `json:"currency_code"`
+	Balance              float64 `json:"balance"`
+	BankTransferNumber   string  `json:"bank_transfer_number,omitempty"`
+	CreditBrand          string  `json:"credit_brand,omitempty"`
+	AvailableCreditLimit float64 `json:"available_credit_limit,omitempty"`
+}
+
+type TransactionSnapshotOutput struct {
+	ID              string  `json:"id"`
+	AccountID       string  `json:"account_id"`
+	ConnectionID    string  `json:"connection_id"`
+	InstitutionName string  `json:"institution_name"`
+	AccountName     string  `json:"account_name"`
+	Description     string  `json:"description"`
+	Category        string  `json:"category"`
+	Type            string  `json:"type"`
+	Status          string  `json:"status"`
+	CurrencyCode    string  `json:"currency_code"`
+	Amount          float64 `json:"amount"`
+	SignedAmount    float64 `json:"signed_amount"`
+	Date            string  `json:"date"`
+	MerchantName    string  `json:"merchant_name,omitempty"`
+}
+
+type CategoryBreakdownOutput struct {
+	Category string  `json:"category"`
+	Amount   float64 `json:"amount"`
+	Percent  float64 `json:"percent"`
+}
+
+type OverviewOutput struct {
+	Accounts            []AccountSnapshotOutput     `json:"accounts"`
+	RecentTransactions  []TransactionSnapshotOutput `json:"recent_transactions"`
+	ExpenseBreakdown    []CategoryBreakdownOutput   `json:"expense_breakdown"`
+	TotalAvailable      float64                     `json:"total_available"`
+	CreditCardBalance   float64                     `json:"credit_card_balance"`
+	MonthIncome         float64                     `json:"month_income"`
+	MonthExpenses       float64                     `json:"month_expenses"`
+	ConnectedAccounts   int                         `json:"connected_accounts"`
+	ConnectionsWithData int                         `json:"connections_with_data"`
+}
+
+type TransactionFeedOutput struct {
+	Transactions              []TransactionSnapshotOutput `json:"transactions"`
+	ExpenseBreakdown          []CategoryBreakdownOutput   `json:"expense_breakdown"`
+	MonthExpenseTotal         float64                     `json:"month_expense_total"`
+	PreviousMonthExpenseTotal float64                     `json:"previous_month_expense_total"`
+	MonthIncomeTotal          float64                     `json:"month_income_total"`
+}

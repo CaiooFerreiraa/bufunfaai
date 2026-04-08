@@ -10,6 +10,7 @@ export const endpoints = {
     list: '/v1/devices',
   },
   openFinance: {
+    accounts: '/v1/open-finance/accounts',
     authorizeConsent: (consentId: string): string => `/v1/open-finance/consents/${consentId}/authorize`,
     callback: '/v1/open-finance/callback',
     completeConsent: (consentId: string): string => `/v1/open-finance/consents/${consentId}/complete`,
@@ -18,7 +19,9 @@ export const endpoints = {
     consentById: (consentId: string): string => `/v1/open-finance/consents/${consentId}`,
     consents: '/v1/open-finance/consents',
     institutions: '/v1/open-finance/institutions',
+    overview: '/v1/open-finance/overview',
     revokeConsent: (consentId: string): string => `/v1/open-finance/consents/${consentId}/revoke`,
+    transactions: '/v1/open-finance/transactions',
     syncConnection: (connectionId: string): string => `/v1/open-finance/connections/${connectionId}/sync`,
     syncStatus: (connectionId: string): string => `/v1/open-finance/connections/${connectionId}/sync-status`,
   },

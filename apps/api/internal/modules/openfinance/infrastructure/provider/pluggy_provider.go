@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,6 +54,57 @@ type pluggyConnector struct {
 	Country        string `json:"country"`
 	Type           string `json:"type"`
 	IsOpenFinance  bool   `json:"isOpenFinance"`
+}
+
+type pluggyAccountListResponse struct {
+	Results []pluggyAccount `json:"results"`
+}
+
+type pluggyAccount struct {
+	ID            string            `json:"id"`
+	ItemID        string            `json:"itemId"`
+	Type          string            `json:"type"`
+	Subtype       string            `json:"subtype"`
+	Number        string            `json:"number"`
+	Name          string            `json:"name"`
+	MarketingName string            `json:"marketingName"`
+	Balance       float64           `json:"balance"`
+	CurrencyCode  string            `json:"currencyCode"`
+	BankData      *pluggyBankData   `json:"bankData"`
+	CreditData    *pluggyCreditData `json:"creditData"`
+}
+
+type pluggyBankData struct {
+	TransferNumber string `json:"transferNumber"`
+}
+
+type pluggyCreditData struct {
+	Brand                string  `json:"brand"`
+	AvailableCreditLimit float64 `json:"availableCreditLimit"`
+}
+
+type pluggyTransactionListResponse struct {
+	Total      int                 `json:"total"`
+	TotalPages int                 `json:"totalPages"`
+	Page       int                 `json:"page"`
+	Results    []pluggyTransaction `json:"results"`
+}
+
+type pluggyTransaction struct {
+	ID           string          `json:"id"`
+	AccountID    string          `json:"accountId"`
+	Description  string          `json:"description"`
+	Amount       float64         `json:"amount"`
+	Date         string          `json:"date"`
+	CurrencyCode string          `json:"currencyCode"`
+	Category     string          `json:"category"`
+	Type         string          `json:"type"`
+	Status       string          `json:"status"`
+	Merchant     *pluggyMerchant `json:"merchant"`
+}
+
+type pluggyMerchant struct {
+	Name string `json:"name"`
 }
 
 type pluggyItem struct {
@@ -158,6 +210,101 @@ func (provider *PluggyProvider) GetItem(ctx context.Context, itemID string) (ofs
 	}
 
 	return mapPluggyItem(response), nil
+}
+
+func (provider *PluggyProvider) ListAccounts(ctx context.Context, itemID string) ([]ofservice.ProviderAccount, error) {
+	if strings.TrimSpace(itemID) == "" {
+		return nil, fmt.Errorf("missing pluggy item id")
+	}
+
+	query := url.Values{}
+	query.Set("itemId", itemID)
+	query.Set("pageSize", "500")
+
+	var response pluggyAccountListResponse
+	if err := provider.doJSON(ctx, http.MethodGet, "/accounts?"+query.Encode(), nil, &response); err != nil {
+		return nil, err
+	}
+
+	accounts := make([]ofservice.ProviderAccount, 0, len(response.Results))
+	for _, account := range response.Results {
+		mapped := ofservice.ProviderAccount{
+			ID:            account.ID,
+			ItemID:        account.ItemID,
+			Type:          account.Type,
+			Subtype:       account.Subtype,
+			Number:        account.Number,
+			Name:          account.Name,
+			MarketingName: account.MarketingName,
+			Balance:       account.Balance,
+			CurrencyCode:  account.CurrencyCode,
+		}
+
+		if account.BankData != nil {
+			mapped.BankTransferNumber = account.BankData.TransferNumber
+		}
+		if account.CreditData != nil {
+			mapped.CreditBrand = account.CreditData.Brand
+			mapped.AvailableCreditLimit = account.CreditData.AvailableCreditLimit
+		}
+
+		accounts = append(accounts, mapped)
+	}
+
+	return accounts, nil
+}
+
+func (provider *PluggyProvider) ListTransactions(ctx context.Context, accountID string, query ofservice.ProviderTransactionQuery) ([]ofservice.ProviderTransaction, error) {
+	if strings.TrimSpace(accountID) == "" {
+		return nil, fmt.Errorf("missing pluggy account id")
+	}
+
+	pageSize := query.PageSize
+	if pageSize <= 0 || pageSize > 500 {
+		pageSize = 500
+	}
+
+	page := 1
+	transactions := make([]ofservice.ProviderTransaction, 0)
+	for {
+		values := url.Values{}
+		values.Set("accountId", accountID)
+		values.Set("page", strconv.Itoa(page))
+		values.Set("pageSize", strconv.Itoa(pageSize))
+		if query.From != nil {
+			values.Set("from", query.From.UTC().Format("2006-01-02"))
+		}
+		if query.To != nil {
+			values.Set("to", query.To.UTC().Format("2006-01-02"))
+		}
+
+		var response pluggyTransactionListResponse
+		if err := provider.doJSON(ctx, http.MethodGet, "/transactions?"+values.Encode(), nil, &response); err != nil {
+			return nil, err
+		}
+
+		for _, transaction := range response.Results {
+			transactions = append(transactions, ofservice.ProviderTransaction{
+				ID:           transaction.ID,
+				AccountID:    transaction.AccountID,
+				Description:  transaction.Description,
+				Amount:       transaction.Amount,
+				Date:         parsePluggyTimeValue(transaction.Date),
+				CurrencyCode: transaction.CurrencyCode,
+				Category:     transaction.Category,
+				Type:         transaction.Type,
+				Status:       transaction.Status,
+				MerchantName: pluggyMerchantName(transaction.Merchant),
+			})
+		}
+
+		if response.TotalPages <= page || len(response.Results) == 0 {
+			break
+		}
+		page++
+	}
+
+	return transactions, nil
 }
 
 func (provider *PluggyProvider) ExchangeCode(_ context.Context, _ entity.Institution, _ entity.Consent, _ string) (ofservice.ProviderTokenSet, error) {
@@ -344,6 +491,14 @@ func mapPluggyItem(item pluggyItem) ofservice.ProviderItem {
 	}
 }
 
+func pluggyMerchantName(merchant *pluggyMerchant) string {
+	if merchant == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(merchant.Name)
+}
+
 func parsePluggyTime(raw string) *time.Time {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -356,6 +511,15 @@ func parsePluggyTime(raw string) *time.Time {
 	}
 
 	return &parsed
+}
+
+func parsePluggyTimeValue(raw string) time.Time {
+	parsed := parsePluggyTime(raw)
+	if parsed == nil {
+		return time.Time{}
+	}
+
+	return parsed.UTC()
 }
 
 func mapPluggyItemStatus(item ofservice.ProviderItem) string {
