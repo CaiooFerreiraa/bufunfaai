@@ -76,7 +76,7 @@ func Build(ctx context.Context) (*App, error) {
 	}
 
 	var (
-		redisClient   *cache.ClientAdapter
+		redisClient     *cache.ClientAdapter
 		readinessProbes []healthhandler.ReadinessProbe
 	)
 
@@ -106,12 +106,22 @@ func Build(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize crypto service: %w", err)
 	}
 
+	userRepo := userrepository.NewPostgresUserRepository(pool)
+	clerkService, err := platformauth.NewClerkService(cfg, userRepo)
+	if err != nil {
+		observabilityShutdown(ctx)
+		pool.Close()
+		if redisClient != nil {
+			_ = redisClient.Close()
+		}
+		return nil, fmt.Errorf("failed to initialize clerk auth: %w", err)
+	}
+
 	jwtService := platformauth.NewJWTService(cfg)
 	requestValidator := platformvalidator.New()
 	server := httplayer.NewServer(cfg, appLogger)
 	observability.AttachGin(server.Engine(), cfg)
 
-	userRepo := userrepository.NewPostgresUserRepository(pool)
 	deviceRepo := devicerepository.NewPostgresDeviceRepository(pool)
 	refreshTokenRepo := authrepository.NewPostgresRefreshTokenRepository(pool)
 	analyticsRepo := analyticsrepository.NewPostgresAnalyticsRepository(pool)
@@ -150,8 +160,7 @@ func Build(ctx context.Context) (*App, error) {
 	)
 	openFinanceUseCases := openfinanceusecase.New(openFinanceService)
 
-	healthHandler := healthhandler.NewHandler(cfg, []healthhandler.ReadinessProbe{
-	})
+	healthHandler := healthhandler.NewHandler(cfg, []healthhandler.ReadinessProbe{})
 	healthHandler = healthhandler.NewHandler(cfg, readinessProbes)
 	authHTTPHandler := authhandler.NewHandler(
 		authusecase.NewRegisterUseCase(authService),
@@ -179,7 +188,7 @@ func Build(ctx context.Context) (*App, error) {
 	publicV1 := server.Engine().Group("/v1")
 	protectedV1 := server.Engine().Group("/v1")
 	internalGroup := server.Engine().Group("/internal")
-	protectedV1.Use(sharedmiddleware.RequireAuthentication(jwtService))
+	protectedV1.Use(sharedmiddleware.RequireAuthentication(clerkService))
 	internalGroup.Use(sharedmiddleware.RequireInternalSecret(cfg.CronSecret))
 
 	authroutes.Register(publicV1, protectedV1, authHTTPHandler)

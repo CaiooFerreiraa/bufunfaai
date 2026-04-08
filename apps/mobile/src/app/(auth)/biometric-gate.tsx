@@ -1,3 +1,4 @@
+import { useClerk } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { Fingerprint } from 'lucide-react-native';
 import type { ReactElement } from 'react';
@@ -7,14 +8,15 @@ import { StyleSheet, View } from 'react-native';
 import { FeatureScreen } from '@/components/layout/FeatureScreen';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
-import { destroySession } from '@/lib/sessionManager';
 import { authenticateWithBiometrics } from '@/services/biometric/biometricService';
 import { useSessionStore } from '@/stores/sessionStore';
 import { theme } from '@/theme/tokens';
 
 export default function BiometricGateScreen(): ReactElement {
   const router = useRouter();
+  const { signOut } = useClerk();
   const setRequiresBiometricUnlock = useSessionStore((state) => state.setRequiresBiometricUnlock);
+  const clearSession = useSessionStore((state) => state.clearSession);
 
   const handleUnlock = useCallback(async (): Promise<void> => {
     const succeeded = await authenticateWithBiometrics();
@@ -27,7 +29,8 @@ export default function BiometricGateScreen(): ReactElement {
   }, [router, setRequiresBiometricUnlock]);
 
   async function handleLogout(): Promise<void> {
-    await destroySession();
+    await signOut();
+    clearSession();
     router.replace('/(public)/welcome');
   }
 
@@ -36,18 +39,18 @@ export default function BiometricGateScreen(): ReactElement {
   }, [handleUnlock]);
 
   return (
-    <FeatureScreen description="Use sua biometria para continuar exatamente de onde parou, sem expor a área privada do app." title="Desbloqueie sua conta">
+    <FeatureScreen description="Confirme sua biometria para continuar." title="Desbloqueie sua conta">
       <View style={styles.content}>
         <View style={styles.badge}>
           <Fingerprint color={theme.colors.accent} size={20} strokeWidth={2} />
           <AppText color={theme.colors.accent} variant="label">
-            Validação local
+            Confirmação rápida
           </AppText>
         </View>
         <Button label="Tentar novamente" onPress={(): void => void handleUnlock()} />
         <Button label="Sair da conta" onPress={(): void => void handleLogout()} style={styles.secondary} variant="secondary" />
         <AppText color={theme.colors.textSecondary}>
-          A biometria protege o acesso local. A sessão da API continua controlada pelo backend.
+          Use sua digital ou reconhecimento facial para entrar no app.
         </AppText>
       </View>
     </FeatureScreen>

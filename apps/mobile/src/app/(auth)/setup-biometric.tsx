@@ -14,10 +14,8 @@ import { theme } from '@/theme/tokens';
 
 export default function SetupBiometricScreen(): ReactElement {
   const router = useRouter();
-  const metadata = useSessionStore((state) => state.metadata);
-  const tokens = useSessionStore((state) => state.tokens);
-  const user = useSessionStore((state) => state.user);
-  const setAuthenticatedSession = useSessionStore((state) => state.setAuthenticatedSession);
+  const setBiometricEnabled = useSessionStore((state) => state.setBiometricEnabled);
+  const setRequiresBiometricUnlock = useSessionStore((state) => state.setRequiresBiometricUnlock);
   const [isPrompting, setIsPrompting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -28,7 +26,7 @@ export default function SetupBiometricScreen(): ReactElement {
 
     setIsPrompting(true);
     const available = await canUseBiometrics();
-    if (!available || !tokens || !user || !metadata) {
+    if (!available) {
       setIsPrompting(false);
       router.replace('/(private)/home');
       return;
@@ -43,17 +41,17 @@ export default function SetupBiometricScreen(): ReactElement {
 
     await setBiometricPreference(true);
     await setBiometricPrompted(true);
-    setAuthenticatedSession(tokens, user, {
-      ...metadata,
-      biometricEnabled: true,
-    });
+    setBiometricEnabled(true);
+    setRequiresBiometricUnlock(false);
     setIsPrompting(false);
     router.replace('/(private)/home');
-  }, [isPrompting, metadata, router, setAuthenticatedSession, tokens, user]);
+  }, [isPrompting, router, setBiometricEnabled, setRequiresBiometricUnlock]);
 
   async function handleSkip(): Promise<void> {
     await setBiometricPreference(false);
     await setBiometricPrompted(true);
+    setBiometricEnabled(false);
+    setRequiresBiometricUnlock(false);
     router.replace('/(private)/home');
   }
 
@@ -62,16 +60,16 @@ export default function SetupBiometricScreen(): ReactElement {
   }, [handleEnableBiometrics]);
 
   return (
-    <FeatureScreen description="Valide sua identidade local agora e deixe o retorno ao app mais rápido e mais seguro." title="Ative sua biometria">
+    <FeatureScreen description="Ative a biometria para entrar mais rápido no app." title="Ative sua biometria">
       <View style={styles.content}>
         <View style={styles.badge}>
           <Fingerprint color={theme.colors.accent} size={20} strokeWidth={2} />
           <AppText color={theme.colors.accent} variant="label">
-            Segurança imediata
+            Acesso rápido
           </AppText>
         </View>
         <AppText color={theme.colors.textSecondary}>
-          A biometria não substitui o login da API. Ela protege apenas o desbloqueio local do aplicativo.
+          Use sua digital ou reconhecimento facial para voltar ao app com mais facilidade.
         </AppText>
         {errorMessage ? <AppText color={theme.colors.error}>{errorMessage}</AppText> : null}
         <Button label={isPrompting ? 'Validando biometria...' : 'Tentar novamente'} onPress={(): void => void handleEnableBiometrics()} />

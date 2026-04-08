@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-import { restoreSession } from '@/lib/sessionManager';
 import { subscribeToConnectivity } from '@/services/network/connectivityService';
+import { getBiometricPreference } from '@/services/storage/preferences';
 import { initializeSQLite } from '@/services/storage/sqlite';
 import { useAppStore } from '@/stores/appStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -16,9 +16,10 @@ export function useAppBootstrap(): boolean {
 
     async function bootstrap(): Promise<void> {
       await initializeSQLite();
-      await restoreSession();
+      const biometricEnabled: boolean = await getBiometricPreference();
 
       if (mounted) {
+        useSessionStore.getState().hydrateSession(biometricEnabled);
         setBootstrapState(false);
       }
     }

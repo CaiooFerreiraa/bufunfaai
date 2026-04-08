@@ -10,17 +10,11 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { theme } from '@/theme/tokens';
 
 export default function ProfileSecurityScreen(): ReactElement {
-  const metadata = useSessionStore((state) => state.metadata);
-  const tokens = useSessionStore((state) => state.tokens);
-  const user = useSessionStore((state) => state.user);
-  const setAuthenticatedSession = useSessionStore((state) => state.setAuthenticatedSession);
+  const biometricEnabled = useSessionStore((state) => state.biometricEnabled);
+  const setBiometricEnabled = useSessionStore((state) => state.setBiometricEnabled);
 
   async function toggleBiometricPreference(): Promise<void> {
-    if (!metadata || !tokens || !user) {
-      return;
-    }
-
-    const nextValue = !metadata.biometricEnabled;
+    const nextValue = !biometricEnabled;
     if (nextValue) {
       const authenticated: boolean = await authenticateWithBiometrics();
       if (!authenticated) {
@@ -29,21 +23,18 @@ export default function ProfileSecurityScreen(): ReactElement {
     }
 
     await setBiometricPreference(nextValue);
-    setAuthenticatedSession(tokens, user, {
-      ...metadata,
-      biometricEnabled: nextValue,
-    });
+    setBiometricEnabled(nextValue);
   }
 
   return (
-    <FeatureScreen description="Proteções locais e preferências sensíveis da sessão do app." title="Segurança">
+    <FeatureScreen description="Proteções locais e preferências de acesso do app." title="Segurança">
       <View style={styles.content}>
-        <AppText>{`Biometria: ${metadata?.biometricEnabled ? 'ativada' : 'desativada'}`}</AppText>
+        <AppText>{`Biometria: ${biometricEnabled ? 'ativada' : 'desativada'}`}</AppText>
         <AppText color={theme.colors.textSecondary}>
-          O desbloqueio biométrico protege a reabertura local do aplicativo.
+          Use sua digital ou reconhecimento facial para voltar ao app com mais rapidez.
         </AppText>
         <Button
-          label={metadata?.biometricEnabled ? 'Desativar biometria' : 'Ativar biometria'}
+          label={biometricEnabled ? 'Desativar biometria' : 'Ativar biometria'}
           onPress={(): void => void toggleBiometricPreference()}
         />
       </View>

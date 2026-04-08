@@ -77,6 +77,7 @@ func newTestEngine() *gin.Engine {
 	requestValidator := platformvalidator.New()
 
 	userRepo := newInMemoryUserRepository()
+	tokenAuthenticator := &testTokenAuthenticator{jwtService: jwtService}
 	deviceRepo := newInMemoryDeviceRepository()
 	refreshRepo := newInMemoryRefreshTokenRepository()
 	analyticsRepo := newInMemoryAnalyticsRepository()
@@ -119,7 +120,7 @@ func newTestEngine() *gin.Engine {
 	publicV1 := server.Engine().Group("/v1")
 	protectedV1 := server.Engine().Group("/v1")
 	internalGroup := server.Engine().Group("/internal")
-	protectedV1.Use(sharedmiddleware.RequireAuthentication(jwtService))
+	protectedV1.Use(sharedmiddleware.RequireAuthentication(tokenAuthenticator))
 	internalGroup.Use(sharedmiddleware.RequireInternalSecret(cfg.CronSecret))
 
 	authroutes.Register(
@@ -155,6 +156,22 @@ func newTestEngine() *gin.Engine {
 	openfinanceroutes.RegisterInternal(internalGroup, openfinancehandler.NewHandler(openFinanceUseCases, requestValidator))
 
 	return server.Engine()
+}
+
+type testTokenAuthenticator struct {
+	jwtService *platformauth.JWTService
+}
+
+func (authenticator *testTokenAuthenticator) Authenticate(_ context.Context, bearerToken string) (platformauth.AuthenticatedIdentity, error) {
+	claims, err := authenticator.jwtService.Parse(bearerToken)
+	if err != nil {
+		return platformauth.AuthenticatedIdentity{}, err
+	}
+
+	return platformauth.AuthenticatedIdentity{
+		LocalUserID: claims.Subject,
+		SessionID:   claims.SessionID,
+	}, nil
 }
 
 type inMemoryUserRepository struct {

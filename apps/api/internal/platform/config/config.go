@@ -21,6 +21,7 @@ type Config struct {
 	RedisURL               string
 	LogLevel               string
 	CORSAllowedOrigins     []string
+	ClerkSecretKey         string
 	AccessTokenSecret      string
 	AccessTokenIssuer      string
 	AccessTokenAudience    string
@@ -84,8 +85,8 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		AppName:                getEnv("APP_NAME", "finance-api"),
-		Environment:            getEnv("APP_ENV", "development"),
+		AppName:     getEnv("APP_NAME", "finance-api"),
+		Environment: getEnv("APP_ENV", "development"),
 		// Vercel Go backends rely on PORT at runtime; APP_PORT remains for local/dev overrides.
 		Port:                   getEnvAny([]string{"PORT", "APP_PORT"}, "3000"),
 		HTTPReadTimeout:        readTimeout,
@@ -95,6 +96,7 @@ func Load() (Config, error) {
 		RedisURL:               getOptionalEnv("REDIS_URL"),
 		LogLevel:               getEnv("LOG_LEVEL", "info"),
 		CORSAllowedOrigins:     getList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:8081", "http://localhost:19006"}),
+		ClerkSecretKey:         getEnv("CLERK_SECRET_KEY", ""),
 		AccessTokenSecret:      getEnv("JWT_ACCESS_SECRET", "change_me"),
 		AccessTokenIssuer:      getEnv("JWT_ACCESS_ISSUER", "finance-api"),
 		AccessTokenAudience:    getEnv("JWT_ACCESS_AUDIENCE", "finance-mobile"),

@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
@@ -5,8 +6,8 @@ import { useSessionStore } from '@/stores/sessionStore';
 
 export function useBiometricAppLock(enabled: boolean): void {
   const appState = useRef<AppStateStatus>(AppState.currentState);
-  const isAuthenticated = useSessionStore((state) => state.isAuthenticated);
-  const metadata = useSessionStore((state) => state.metadata);
+  const { isSignedIn } = useAuth();
+  const biometricEnabled = useSessionStore((state) => state.biometricEnabled);
   const requiresBiometricUnlock = useSessionStore((state) => state.requiresBiometricUnlock);
   const setRequiresBiometricUnlock = useSessionStore((state) => state.setRequiresBiometricUnlock);
 
@@ -19,8 +20,8 @@ export function useBiometricAppLock(enabled: boolean): void {
       const previousState: AppStateStatus = appState.current;
 
       if (
-        metadata?.biometricEnabled &&
-        isAuthenticated &&
+        biometricEnabled &&
+        isSignedIn &&
         !requiresBiometricUnlock &&
         (previousState === 'background' || previousState === 'inactive') &&
         nextState === 'active'
@@ -34,5 +35,5 @@ export function useBiometricAppLock(enabled: boolean): void {
     return (): void => {
       subscription.remove();
     };
-  }, [enabled, isAuthenticated, metadata?.biometricEnabled, requiresBiometricUnlock, setRequiresBiometricUnlock]);
+  }, [biometricEnabled, enabled, isSignedIn, requiresBiometricUnlock, setRequiresBiometricUnlock]);
 }

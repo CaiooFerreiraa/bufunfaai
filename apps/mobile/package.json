@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@bufunfa/shared-types": "workspace:*",
+    "@clerk/expo": "^3.1.8",
     "@expo-google-fonts/instrument-serif": "^0.4.1",
     "@expo-google-fonts/manrope": "^0.4.2",
     "@expo/metro-runtime": "~6.1.2",

@@ -16,7 +16,7 @@ const (
 	sessionIDContextKey string = "session_id"
 )
 
-func RequireAuthentication(jwtService *platformauth.JWTService) gin.HandlerFunc {
+func RequireAuthentication(authenticator platformauth.TokenAuthenticator) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		authorizationHeader := context.GetHeader("Authorization")
 		if authorizationHeader == "" {
@@ -32,15 +32,15 @@ func RequireAuthentication(jwtService *platformauth.JWTService) gin.HandlerFunc 
 			return
 		}
 
-		claims, err := jwtService.Parse(parts[1])
+		identity, err := authenticator.Authenticate(context.Request.Context(), parts[1])
 		if err != nil {
 			response.Error(context, sharederrors.New("UNAUTHORIZED", "token invalido ou expirado", http.StatusUnauthorized))
 			context.Abort()
 			return
 		}
 
-		context.Set(userIDContextKey, claims.Subject)
-		context.Set(sessionIDContextKey, claims.SessionID)
+		context.Set(userIDContextKey, identity.LocalUserID)
+		context.Set(sessionIDContextKey, identity.SessionID)
 		context.Next()
 	}
 }

@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { Redirect, Stack } from 'expo-router';
 import type { ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -8,11 +9,15 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { theme } from '@/theme/tokens';
 
 export default function PrivateLayout(): ReactElement {
-  const isAuthenticated = useSessionStore((state) => state.isAuthenticated);
+  const { isLoaded, isSignedIn } = useAuth();
   const requiresBiometricUnlock = useSessionStore((state) => state.requiresBiometricUnlock);
   const insets = useSafeAreaInsets();
 
-  if (!isAuthenticated) {
+  if (!isLoaded) {
+    return <></>;
+  }
+
+  if (!isSignedIn) {
     return <Redirect href="/(public)/welcome" />;
   }
 

@@ -1,16 +1,11 @@
 import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-import { refreshSessionRequest } from '@/features/auth/services/authService';
-import { destroySession, persistSession } from '@/lib/sessionManager';
+import { getClerkToken } from '@/lib/clerkToken';
 import { apiClient } from '@/services/api/client';
-import { useSessionStore } from '@/stores/sessionStore';
-
-let isRefreshing: boolean = false;
-let refreshPromise: Promise<void> | null = null;
 
 export function registerApiInterceptors(): void {
-  apiClient.interceptors.request.use((config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    const accessToken: string | undefined = useSessionStore.getState().tokens?.accessToken;
+  apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
+    const accessToken: string | null = await getClerkToken();
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -27,28 +22,7 @@ export function registerApiInterceptors(): void {
       }
 
       originalRequest._retry = true;
-
-      if (!isRefreshing) {
-        isRefreshing = true;
-        refreshPromise = (async (): Promise<void> => {
-          const response = await refreshSessionRequest();
-          await persistSession(response.tokens, response.user);
-        })().finally((): void => {
-          isRefreshing = false;
-        });
-      }
-
-      try {
-        await refreshPromise;
-        const nextAccessToken: string | undefined = useSessionStore.getState().tokens?.accessToken;
-        if (nextAccessToken) {
-          originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`;
-        }
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        await destroySession();
-        throw refreshError;
-      }
+      throw error;
     },
   );
 }
