@@ -6,9 +6,16 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#070A12",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      }
+    },
     "experiments": {
       "typedRoutes": true
     },
@@ -20,6 +27,9 @@
     ],
     "extra": {
       "router": {}
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

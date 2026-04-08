@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import type { ReactElement } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +15,15 @@ export default function WelcomeScreen(): ReactElement {
     <Screen>
       <View style={styles.container}>
         <View style={styles.hero}>
+          <View style={styles.brandRow}>
+            <Image source={require('../../../assets/logo-mark.png')} style={styles.brandMark} />
+            <View style={styles.brandText}>
+              <AppText color={theme.colors.accent} variant="label">
+                BufunfaAI
+              </AppText>
+              <AppText color={theme.colors.textSecondary}>Financial operating system</AppText>
+            </View>
+          </View>
           <AppText color={theme.colors.accent} variant="label">
             Private finance cockpit
           </AppText>
@@ -70,6 +79,18 @@ const styles = StyleSheet.create({
   hero: {
     gap: theme.spacing.md,
     paddingTop: theme.spacing.md,
+  },
+  brandRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  brandMark: {
+    height: 56,
+    width: 56,
+  },
+  brandText: {
+    gap: 2,
   },
   highlightCard: {
     backgroundColor: theme.colors.surfaceInverse,

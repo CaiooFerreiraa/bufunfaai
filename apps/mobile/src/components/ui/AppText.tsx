@@ -33,19 +33,21 @@ const styles = StyleSheet.create({
   display: {
     fontFamily: theme.fonts.display,
     fontSize: 36,
-    fontWeight: '400',
+    fontWeight: '700',
     letterSpacing: -0.9,
     lineHeight: 40,
   },
   headline: {
     fontFamily: theme.fonts.display,
     fontSize: 24,
+    fontWeight: '700',
     letterSpacing: -0.4,
     lineHeight: 30,
   },
   label: {
     fontFamily: theme.fonts.label,
     fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 1.5,
     lineHeight: 16,
     textTransform: 'uppercase',

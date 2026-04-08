@@ -1,3 +1,12 @@
+import { Platform } from 'react-native';
+
+const arialFamily: string = Platform.select({
+  android: 'sans-serif',
+  default: 'Arial',
+  ios: 'Arial',
+  web: 'Arial, sans-serif',
+}) ?? 'Arial';
+
 export const theme = {
   colors: {
     primary: '#C7FF45',
@@ -19,9 +28,9 @@ export const theme = {
     error: '#FF6B78',
   },
   fonts: {
-    body: 'Manrope_500Medium',
-    display: 'InstrumentSerif_400Regular',
-    label: 'Manrope_600SemiBold',
+    body: arialFamily,
+    display: arialFamily,
+    label: arialFamily,
     mono: 'monospace',
   },
   spacing: {
