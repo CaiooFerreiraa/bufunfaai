@@ -28,7 +28,8 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-notifications",
-      "@clerk/expo"
+      "@clerk/expo",
+      "expo-font"
     ],
     "extra": {
       "router": {},
