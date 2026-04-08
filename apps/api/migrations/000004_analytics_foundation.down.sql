@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS report_exports;
+DROP TABLE IF EXISTS insights;
+DROP TABLE IF EXISTS financial_goals;
+DROP TABLE IF EXISTS cashflow_forecasts;
+DROP TABLE IF EXISTS anomalies;
+DROP TABLE IF EXISTS financial_scores;
+DROP TABLE IF EXISTS budget_snapshots;
+DROP TABLE IF EXISTS category_budgets;
+DROP TABLE IF EXISTS transaction_classifications;

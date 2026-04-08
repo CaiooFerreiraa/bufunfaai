@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+.pnpm-store/
+.agent/
+
+# build outputs
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# expo
+.expo/
+.expo-shared/
+web-build/
+
+# go
+bin/
+tmp/
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# editor / system
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# logs
+*.log
+
+# generated
+apps/api/docs/
+*.exe

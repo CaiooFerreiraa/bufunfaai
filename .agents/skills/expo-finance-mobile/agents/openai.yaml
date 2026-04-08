@@ -1,0 +1,4 @@
+interface:
+  display_name: "Expo Finance Mobile"
+  short_description: "Cria apps Expo financeiros com arquitetura limpa."
+  default_prompt: "Use $expo-finance-mobile para criar ou evoluir um app financeiro mobile com Expo Router, Clerk, NativeWind, Zustand e TanStack Query."

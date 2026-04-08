@@ -1,0 +1,14 @@
+{
+  "extends": "./base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "react",
+      "react-native",
+      "expo-router/types"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Animated UI"
+  short_description: "Cria interfaces React animadas com alto impacto."
+  default_prompt: "Use $animated-ui para desenhar e implementar uma interface animada com React Bits, Aceternity UI e Magic UI."

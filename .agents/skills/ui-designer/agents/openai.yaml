@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI Designer"
+  short_description: "Cria interfaces com identidade visual forte."
+  default_prompt: "Use $ui-designer para definir e implementar uma interface com identidade visual forte e sem cara de template."

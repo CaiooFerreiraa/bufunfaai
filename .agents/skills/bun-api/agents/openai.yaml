@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bun API"
+  short_description: "Implementa APIs Bun com Clean Architecture e TDD."
+  default_prompt: "Use $bun-api para criar ou evoluir uma API em Bun com TypeScript strict, arquitetura limpa, TDD, Zod e Prisma."

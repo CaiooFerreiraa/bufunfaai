@@ -1,0 +1,4 @@
+interface:
+  display_name: "AbacatePay"
+  short_description: "Integra cobrancas PIX e cartao com AbacatePay."
+  default_prompt: "Use $abacatepay para integrar cobrancas, PIX, webhooks e operacoes de cliente na API da AbacatePay."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next.js + Bun"
+  short_description: "Cria apps Next.js atuais com Bun e App Router."
+  default_prompt: "Use $nextjs-bun para criar ou evoluir um projeto Next.js com App Router, Bun, TypeScript strict, shadcn/ui, Tailwind e Prisma."

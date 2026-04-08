@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS consents;
+DROP TABLE IF EXISTS institutions;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS login_attempts;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS user_profiles;
+DROP TABLE IF EXISTS users;
