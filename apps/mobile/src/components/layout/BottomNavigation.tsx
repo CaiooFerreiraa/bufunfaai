@@ -67,13 +67,14 @@ export function BottomNavigation(): ReactElement {
               pressed ? styles.itemPressed : {},
             ]}
           >
+            <View style={[styles.activeIndicator, isActive ? styles.activeIndicatorVisible : styles.activeIndicatorHidden]} />
             <Icon
-              color={isActive ? theme.colors.textInverse : theme.colors.textSecondary}
-              size={18}
+              color={isActive ? '#25D366' : theme.colors.textSecondary}
+              size={20}
               strokeWidth={2}
             />
             <AppText
-              color={isActive ? theme.colors.textInverse : theme.colors.textSecondary}
+              color={isActive ? '#25D366' : theme.colors.textSecondary}
               variant="label"
             >
               {item.label}
@@ -87,37 +88,44 @@ export function BottomNavigation(): ReactElement {
 
 const styles = StyleSheet.create({
   shell: {
-    backgroundColor: '#0B101B',
-    borderColor: theme.colors.border,
-    borderRadius: 30,
-    borderWidth: 1,
+    backgroundColor: theme.colors.surface,
+    borderTopColor: theme.colors.border,
+    borderTopWidth: 1,
     flexDirection: 'row',
-    gap: theme.spacing.sm,
-    padding: 10,
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 18,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
+    paddingTop: 4,
+    paddingHorizontal: theme.spacing.xs,
   },
   item: {
     alignItems: 'center',
-    borderRadius: 20,
     flex: 1,
-    gap: 6,
-    minHeight: 56,
+    gap: 4,
+    minHeight: 58,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
   },
   itemActive: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: 'transparent',
   },
   itemIdle: {
     backgroundColor: 'transparent',
   },
   itemPressed: {
     opacity: 0.92,
+  },
+  activeIndicator: {
+    borderRadius: theme.radii.pill,
+    height: 3,
+    marginBottom: 8,
+    width: 28,
+  },
+  activeIndicatorVisible: {
+    backgroundColor: '#25D366',
+    opacity: 1,
+  },
+  activeIndicatorHidden: {
+    backgroundColor: 'transparent',
+    opacity: 0,
   },
 });

@@ -30,7 +30,7 @@ export default function PrivateLayout(): ReactElement {
           headerShown: false,
         }}
       />
-      <View style={[styles.navWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.navWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         <BottomNavigation />
       </View>
     </View>
@@ -43,9 +43,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navWrap: {
+    backgroundColor: theme.colors.surface,
     bottom: 0,
     left: 0,
-    paddingHorizontal: theme.spacing.lg,
     position: 'absolute',
     right: 0,
   },

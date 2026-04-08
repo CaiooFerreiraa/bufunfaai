@@ -68,13 +68,15 @@ export default function HomeScreen(): ReactElement {
               <AppText variant="label">BufunfaAI wallet</AppText>
             </View>
             <AppText variant="display">Olá, {userName}</AppText>
-            <AppText color={theme.colors.textSecondary}>
-              Seu painel principal foi redesenhado para leitura rápida de saldo, sinais e movimento.
-            </AppText>
           </View>
           <View style={styles.headerAction}>
             <Bell color={theme.colors.textPrimary} size={18} strokeWidth={2} />
           </View>
+        </View>
+        <View style={styles.headerDescription}>
+          <AppText color={theme.colors.textSecondary}>
+            Seu painel principal foi redesenhado para leitura rápida de saldo, sinais e movimento.
+          </AppText>
         </View>
 
         <Card style={styles.balanceCard}>
@@ -212,7 +214,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: theme.spacing.lg,
+    gap: theme.spacing.md,
     justifyContent: 'space-between',
   },
   headerText: {
@@ -246,6 +248,9 @@ const styles = StyleSheet.create({
     height: 42,
     justifyContent: 'center',
     width: 42,
+  },
+  headerDescription: {
+    marginTop: -theme.spacing.md + theme.spacing.sm,
   },
   balanceCard: {
     backgroundColor: theme.colors.surfaceInverse,
