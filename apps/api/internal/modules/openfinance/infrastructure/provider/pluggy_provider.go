@@ -53,6 +53,7 @@ type pluggyConnector struct {
 	ImageURL       string `json:"imageUrl"`
 	Country        string `json:"country"`
 	Type           string `json:"type"`
+	IsSandbox      bool   `json:"isSandbox"`
 	IsOpenFinance  bool   `json:"isOpenFinance"`
 }
 
@@ -150,8 +151,13 @@ func (provider *PluggyProvider) ListInstitutions(ctx context.Context) ([]entity.
 	now := time.Now().UTC()
 	institutions := make([]entity.Institution, 0, len(response.Results))
 	for _, connector := range response.Results {
-		if connector.Country != "BR" || !connector.IsOpenFinance {
+		if !isSupportedPluggyConnector(connector) {
 			continue
+		}
+
+		status := "active"
+		if connector.IsSandbox || isPluggySandboxName(connector.Name) {
+			status = "sandbox"
 		}
 
 		institutions = append(institutions, entity.Institution{
@@ -162,7 +168,7 @@ func (provider *PluggyProvider) ListInstitutions(ctx context.Context) ([]entity.
 			AuthorisationServerURL: provider.baseURL,
 			ResourcesBaseURL:       provider.baseURL,
 			LogoURL:                connector.ImageURL,
-			Status:                 "active",
+			Status:                 status,
 			SupportsDataSharing:    true,
 			SupportsPayments:       connector.Type == "PERSONAL_BANK" || connector.Type == "BUSINESS_BANK",
 			LastDirectorySyncAt:    &now,
@@ -548,4 +554,21 @@ func normalizePluggyErrorCode(value string) string {
 	}
 
 	return value
+}
+
+func isSupportedPluggyConnector(connector pluggyConnector) bool {
+	if connector.Country != "BR" {
+		return false
+	}
+
+	if connector.IsOpenFinance || connector.IsSandbox {
+		return true
+	}
+
+	return isPluggySandboxName(connector.Name)
+}
+
+func isPluggySandboxName(name string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	return strings.Contains(normalized, "pluggy")
 }

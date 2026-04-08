@@ -213,12 +213,15 @@ func NewService(
 
 func (service *Service) EnsureInstitutions(ctx context.Context) *sharederrors.AppError {
 	institutions, err := service.institutionRepository.List(ctx)
-	if err == nil && len(institutions) > 0 {
+	if err == nil && len(institutions) > 0 && hasSandboxInstitution(institutions) {
 		return nil
 	}
 
 	discoveredInstitutions, err := service.provider.ListInstitutions(ctx)
 	if err != nil {
+		if len(institutions) > 0 {
+			return nil
+		}
 		return sharederrors.Wrap("OPEN_FINANCE_DISCOVERY_ERROR", "erro ao sincronizar instituicoes", 500, err)
 	}
 
@@ -1052,6 +1055,17 @@ func normalizeTransactionAmount(transaction TransactionSnapshot) float64 {
 		return -amount
 	}
 	return amount
+}
+
+func hasSandboxInstitution(institutions []entity.Institution) bool {
+	for _, institution := range institutions {
+		name := strings.ToLower(strings.TrimSpace(institution.DisplayName))
+		if institution.Status == "sandbox" || strings.Contains(name, "pluggy") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildSyncJobsFromConnection(connection entity.Connection, now time.Time) []entity.SyncJob {

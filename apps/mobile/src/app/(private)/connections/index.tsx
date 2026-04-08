@@ -11,14 +11,13 @@ import { FeatureScreen } from '@/components/layout/FeatureScreen';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { env } from '@/constants/env';
 import {
   useCompleteInstitutionConnectionMutation,
   useConnectionsQuery,
   useCreateConnectSessionMutation,
   useInstitutionsQuery,
 } from '@/features/connections/hooks/useConnections';
-import type { ConnectSession } from '@/features/connections/types/connections.types';
+import type { ConnectSession, InstitutionItem } from '@/features/connections/types/connections.types';
 import { theme } from '@/theme/tokens';
 
 export default function ConnectionsScreen(): ReactElement {
@@ -29,7 +28,7 @@ export default function ConnectionsScreen(): ReactElement {
   const [activeSession, setActiveSession] = useState<ConnectSession | null>(null);
 
   async function handleConnectFirstInstitution(): Promise<void> {
-    const firstInstitution = institutionsQuery.data?.[0];
+    const firstInstitution = findPreferredInstitution(institutionsQuery.data);
     if (!firstInstitution) {
       return;
     }
@@ -47,7 +46,7 @@ export default function ConnectionsScreen(): ReactElement {
     return (
       <PluggyConnect
         connectToken={activeSession.connect_token}
-        includeSandbox={env.appEnv !== 'production'}
+        includeSandbox
         language="pt"
         selectedConnectorId={activeSession.selected_connector_id}
         onClose={(): void => setActiveSession(null)}
@@ -98,7 +97,7 @@ export default function ConnectionsScreen(): ReactElement {
           </View>
         </View>
         <AppText color={theme.colors.textSecondary}>
-          A proposta visual agora trata suas integrações como módulos ativos do cockpit, não como uma lista burocrática.
+          Enquanto sua conta da Pluggy estiver em teste, use o banco sandbox para validar o fluxo completo de conexão.
         </AppText>
       </Card>
 
@@ -142,7 +141,7 @@ export default function ConnectionsScreen(): ReactElement {
           ) : (
             <EmptyState
               actionLabel={createConnectSessionMutation.isPending ? 'Preparando...' : 'Conectar primeiro banco'}
-              description="Escolha um banco, autorize a leitura e acompanhe tudo daqui."
+              description="Use o banco sandbox da Pluggy para validar a jornada enquanto os conectores reais não forem liberados."
               onActionPress={(): void => void handleConnectFirstInstitution()}
               title="Nenhuma conexão ativa"
             />
@@ -158,7 +157,9 @@ export default function ConnectionsScreen(): ReactElement {
                 <View key={institution.id} style={styles.row}>
                   <View style={styles.meta}>
                     <AppText>{institution.display_name}</AppText>
-                    <AppText color={theme.colors.textSecondary}>{institution.status}</AppText>
+                    <AppText color={theme.colors.textSecondary}>
+                      {institution.status === 'sandbox' ? 'sandbox' : institution.status}
+                    </AppText>
                   </View>
                   <Button
                     label={createConnectSessionMutation.isPending ? 'Preparando...' : 'Conectar'}
@@ -172,6 +173,19 @@ export default function ConnectionsScreen(): ReactElement {
         </>
       ) : null}
     </FeatureScreen>
+  );
+}
+
+function findPreferredInstitution(institutions: readonly InstitutionItem[] | undefined): InstitutionItem | undefined {
+  if (!institutions || institutions.length === 0) {
+    return undefined;
+  }
+
+  return (
+    institutions.find((institution: InstitutionItem): boolean => {
+      const name = institution.display_name.toLowerCase();
+      return institution.status === 'sandbox' || name.includes('pluggy') || name.includes('sandbox');
+    }) ?? institutions[0]
   );
 }
 
